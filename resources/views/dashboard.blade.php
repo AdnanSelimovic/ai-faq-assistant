@@ -1,77 +1,53 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+@extends('layouts.app')
 
-        <title>Dashboard</title>
+@section('title', 'Dashboard')
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+@section('content')
+    <div class="space-y-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Dashboard</h1>
+                <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    You are signed in with the single-user email. Use the knowledge base to manage sources.
+                </p>
+            </div>
+            <a
+                href="{{ route('kb.documents.index') }}"
+                class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+            >
+                Go to knowledge base
+            </a>
+        </div>
 
-        @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-            @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @else
-            @include('partials.tailwind-fallback')
-        @endif
-    </head>
-    <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
-        <div class="w-full lg:max-w-4xl max-w-[335px]">
-            <div class="mb-6 flex items-center justify-between text-sm text-[#706f6c] dark:text-[#A1A09A]">
-                <span class="inline-flex items-center gap-3">
-                    <span class="h-2.5 w-2.5 rounded-full bg-[#F53003] dark:bg-[#FF4433]"></span>
-                    Knowledge base dashboard
-                </span>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="rounded-sm border border-[#19140035] dark:border-[#3E3E3A] bg-white dark:bg-[#161615] px-3 py-1.5 text-sm font-medium text-[#1b1b18] dark:text-[#EDEDEC] hover:border-[#1915014a] dark:hover:border-[#62605b]"
-                    >
-                        Log out
-                    </button>
-                </form>
+        <div class="grid gap-6 lg:grid-cols-2">
+            <div class="rounded-xl border border-zinc-200/70 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Ask a question</h2>
+                <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    This is a placeholder until retrieval and embeddings are wired up.
+                </p>
+                <div class="mt-4">
+                    <label for="question" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Question</label>
+                    <div class="mt-2">
+                        <x-textarea
+                            id="question"
+                            rows="5"
+                            placeholder="What are the hours of support for premium customers?"
+                        ></x-textarea>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <x-button type="button">Ask</x-button>
+                    </div>
+                </div>
             </div>
 
-            <div class="bg-white dark:bg-[#161615] border border-[#e3e3e0] dark:border-[#3E3E3A] rounded-sm shadow-[0px_0px_1px_0px_rgba(0,0,0,0.03),0px_1px_2px_0px_rgba(0,0,0,0.06)] p-6 lg:p-8">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <h1 class="text-[13px] leading-[20px] font-medium text-[#1b1b18] dark:text-[#EDEDEC]">Dashboard</h1>
-                        <p class="mt-2 text-sm text-[#706f6c] dark:text-[#A1A09A]">
-                            You are signed in with the single-user email.
-                        </p>
-                    </div>
-                    <span class="hidden lg:inline-flex items-center rounded-sm border border-[#19140035] dark:border-[#3E3E3A] px-3 py-1.5 text-[13px] text-[#1b1b18] dark:text-[#EDEDEC]">
-                        {{ config('app.name', 'AI FAQ Assistant') }}
-                    </span>
-                </div>
-
-                <div class="mt-6 rounded-sm border border-[#e3e3e0] dark:border-[#3E3E3A] bg-[#FDFDFC] dark:bg-[#0a0a0a] p-4">
-                    <label for="question" class="block text-sm font-medium text-[#1b1b18] dark:text-[#EDEDEC]">
-                        Ask a question
-                    </label>
-                    <textarea
-                        id="question"
-                        rows="4"
-                        class="mt-2 w-full rounded-sm border border-[#e3e3e0] dark:border-[#3E3E3A] bg-white dark:bg-[#161615] px-3 py-2 text-sm text-[#1b1b18] dark:text-[#EDEDEC] focus:outline-none focus:border-[#1915014a] dark:focus:border-[#62605b]"
-                        placeholder="What are the hours of support for premium customers?"
-                    ></textarea>
-                    <div class="mt-3 flex justify-end">
-                        <button
-                            type="button"
-                            class="rounded-sm bg-[#1b1b18] text-white px-4 py-2 text-sm font-medium hover:bg-black"
-                        >
-                            Ask
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-6 border-t border-[#e3e3e0] dark:border-[#3E3E3A] pt-4 text-sm text-[#706f6c] dark:text-[#A1A09A]">
-                    Responses will appear here once retrieval is enabled.
-                </div>
+            <div class="rounded-xl border border-zinc-200/70 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Next steps</h2>
+                <ul class="mt-3 space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    <li>Upload or paste source text in the knowledge base.</li>
+                    <li>Run indexing to generate chunks.</li>
+                    <li>Connect embeddings when ready.</li>
+                </ul>
             </div>
         </div>
-    </body>
-</html>
-
-
+    </div>
+@endsection

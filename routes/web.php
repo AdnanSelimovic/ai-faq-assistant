@@ -13,7 +13,7 @@ Route::get('/login', [EmailLoginController::class, 'create'])
     ->middleware('guest')
     ->name('login');
 Route::post('/login', [EmailLoginController::class, 'store'])
-    ->middleware('guest');
+    ->middleware(['guest', 'throttle:login']);
 Route::post('/logout', [EmailLoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
@@ -40,5 +40,5 @@ Route::middleware('auth')
     });
 
 Route::post('/ask', [ChatController::class, 'ask'])
-    ->middleware('auth')
+    ->middleware(['auth', 'throttle:ask'])
     ->name('chat.ask');

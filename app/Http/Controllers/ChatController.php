@@ -34,14 +34,29 @@ class ChatController extends Controller
 
         try {
             $chunks = KbChunk::query()
-                ->selectRaw('kb_chunks.*, MATCH(content) AGAINST(? IN BOOLEAN MODE) AS score', [$query])
-                ->whereRaw('MATCH(content) AGAINST(? IN BOOLEAN MODE)', [$query])
+                ->selectRaw('kb_chunks.*, MATCH(content) AGAINST(? IN NATURAL LANGUAGE MODE) AS score', [$query])
+                ->whereFullText('content', $query)
                 ->orderByDesc('score')
                 ->limit(5)
                 ->get();
         } catch (\Throwable $e) {
+            $chunks = collect();
+        }
+
+        if ($chunks->isEmpty()) {
+            $terms = preg_split('/\s+/', strtolower(preg_replace('/[^a-z0-9\s]/i', ' ', $query)));
+            $terms = array_values(array_filter($terms, fn ($term) => strlen($term) > 2));
+
             $chunks = KbChunk::query()
-                ->where('content', 'like', '%' . $query . '%')
+                ->when($terms, function ($builder) use ($terms) {
+                    $builder->where(function ($subQuery) use ($terms) {
+                        foreach ($terms as $term) {
+                            $subQuery->orWhere('content', 'like', '%' . $term . '%');
+                        }
+                    });
+                }, function ($builder) use ($query) {
+                    $builder->where('content', 'like', '%' . $query . '%');
+                })
                 ->limit(5)
                 ->get();
         }

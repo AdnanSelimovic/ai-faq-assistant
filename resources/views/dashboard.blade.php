@@ -35,7 +35,9 @@
                         ></x-textarea>
                     </div>
                     <div class="mt-4 flex justify-end">
-                        <x-button type="button" id="ask-button">Ask</x-button>
+                        <x-button type="button" id="ask-button">
+                            <span id="ask-button-text">Ask</span>
+                        </x-button>
                     </div>
                     <div id="ask-error" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></div>
                     <div id="ask-result" class="mt-4 hidden space-y-3">
@@ -43,10 +45,12 @@
                             <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Answer</div>
                             <p id="ask-answer" class="mt-2 text-sm text-zinc-700 dark:text-zinc-200"></p>
                         </div>
-                        <div>
-                            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Retrieved chunks</div>
-                            <div id="ask-chunks" class="mt-2 space-y-2"></div>
-                        </div>
+                        <details class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
+                            <summary class="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                Sources
+                            </summary>
+                            <div id="ask-chunks" class="mt-3 space-y-2"></div>
+                        </details>
                     </div>
                 </div>
             </div>
@@ -64,6 +68,7 @@
 
     <script>
         const askButton = document.getElementById('ask-button');
+        const askButtonText = document.getElementById('ask-button-text');
         const questionInput = document.getElementById('question');
         const askError = document.getElementById('ask-error');
         const askResult = document.getElementById('ask-result');
@@ -74,11 +79,15 @@
             askError.classList.add('hidden');
             askResult.classList.add('hidden');
             askChunks.innerHTML = '';
+            askButton.setAttribute('disabled', 'disabled');
+            askButtonText.textContent = 'Asking...';
 
             const question = questionInput.value.trim();
             if (!question) {
                 askError.textContent = 'Please enter a question.';
                 askError.classList.remove('hidden');
+                askButton.removeAttribute('disabled');
+                askButtonText.textContent = 'Ask';
                 return;
             }
 
@@ -96,6 +105,8 @@
                     const payload = await response.json().catch(() => ({}));
                     askError.textContent = payload.message || 'Unable to process your question.';
                     askError.classList.remove('hidden');
+                    askButton.removeAttribute('disabled');
+                    askButtonText.textContent = 'Ask';
                     return;
                 }
 
@@ -109,9 +120,13 @@
                 });
 
                 askResult.classList.remove('hidden');
+                askButton.removeAttribute('disabled');
+                askButtonText.textContent = 'Ask';
             } catch (error) {
                 askError.textContent = 'Network error while asking the question.';
                 askError.classList.remove('hidden');
+                askButton.removeAttribute('disabled');
+                askButtonText.textContent = 'Ask';
             }
         });
     </script>

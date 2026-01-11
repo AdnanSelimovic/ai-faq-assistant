@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EmailLoginController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\KbDocumentController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,3 +38,7 @@ Route::middleware('auth')
         Route::post('/documents/{id}/index', [KbDocumentController::class, 'indexDocument'])
             ->name('kb.documents.index-document');
     });
+
+Route::post('/ask', [ChatController::class, 'ask'])
+    ->middleware('auth')
+    ->name('chat.ask');

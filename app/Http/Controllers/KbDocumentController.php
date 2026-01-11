@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\KbChunk;
 use App\Models\KbDocument;
-use App\Services\TextChunker;
+use App\Services\KbIndexer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class KbDocumentController extends Controller
@@ -62,52 +60,12 @@ class KbDocumentController extends Controller
         ]);
     }
 
-    public function indexDocument(int $id, TextChunker $chunker): RedirectResponse
+    public function indexDocument(int $id, KbIndexer $indexer): RedirectResponse
     {
         $document = KbDocument::findOrFail($id);
-        $meta = $document->meta ?? [];
-        $rawText = $meta['raw_text'] ?? null;
-
-        if (!is_string($rawText) || $rawText === '') {
-            $meta['error'] = 'Missing raw_text in document meta.';
-            $document->update([
-                'status' => 'error',
-                'meta' => $meta,
-            ]);
-
-            return back()->withErrors(['raw_text' => 'Document is missing raw text.']);
-        }
-
-        try {
-            DB::transaction(function () use ($document, $chunker, $rawText, &$meta) {
-                $document->chunks()->delete();
-
-                $chunks = $chunker->chunk($rawText, 1000, 120);
-                foreach ($chunks as $index => $content) {
-                    KbChunk::create([
-                        'document_id' => $document->id,
-                        'chunk_index' => $index,
-                        'content' => $content,
-                        'content_hash' => hash('sha256', $content),
-                        'embedding' => null,
-                        'token_count' => null,
-                    ]);
-                }
-
-                unset($meta['error']);
-                $document->update([
-                    'status' => 'indexed',
-                    'meta' => $meta,
-                ]);
-            });
-        } catch (\Throwable $e) {
-            $meta['error'] = $e->getMessage();
-            $document->update([
-                'status' => 'error',
-                'meta' => $meta,
-            ]);
-
-            return back()->withErrors(['index' => 'Indexing failed.']);
+        $error = $indexer->index($document);
+        if ($error) {
+            return back()->withErrors(['index' => $error]);
         }
 
         return back();

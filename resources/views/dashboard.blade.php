@@ -23,7 +23,7 @@
             <div class="rounded-xl border border-zinc-200/70 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                 <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Ask a question</h2>
                 <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    This is a placeholder until retrieval and embeddings are wired up.
+                    Retrieval is enabled. Answers are placeholder until embeddings are wired up.
                 </p>
                 <div class="mt-4">
                     <label for="question" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Question</label>
@@ -35,7 +35,18 @@
                         ></x-textarea>
                     </div>
                     <div class="mt-4 flex justify-end">
-                        <x-button type="button">Ask</x-button>
+                        <x-button type="button" id="ask-button">Ask</x-button>
+                    </div>
+                    <div id="ask-error" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></div>
+                    <div id="ask-result" class="mt-4 hidden space-y-3">
+                        <div>
+                            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Answer</div>
+                            <p id="ask-answer" class="mt-2 text-sm text-zinc-700 dark:text-zinc-200"></p>
+                        </div>
+                        <div>
+                            <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Retrieved chunks</div>
+                            <div id="ask-chunks" class="mt-2 space-y-2"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -50,4 +61,58 @@
             </div>
         </div>
     </div>
+
+    <script>
+        const askButton = document.getElementById('ask-button');
+        const questionInput = document.getElementById('question');
+        const askError = document.getElementById('ask-error');
+        const askResult = document.getElementById('ask-result');
+        const askAnswer = document.getElementById('ask-answer');
+        const askChunks = document.getElementById('ask-chunks');
+
+        askButton.addEventListener('click', async () => {
+            askError.classList.add('hidden');
+            askResult.classList.add('hidden');
+            askChunks.innerHTML = '';
+
+            const question = questionInput.value.trim();
+            if (!question) {
+                askError.textContent = 'Please enter a question.';
+                askError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('{{ route('chat.ask') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ question }),
+                });
+
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => ({}));
+                    askError.textContent = payload.message || 'Unable to process your question.';
+                    askError.classList.remove('hidden');
+                    return;
+                }
+
+                const payload = await response.json();
+                askAnswer.textContent = payload.answer || '';
+                (payload.chunks || []).forEach((chunk) => {
+                    const item = document.createElement('div');
+                    item.className = 'rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200';
+                    item.textContent = `#${chunk.id}: ${chunk.snippet}`;
+                    askChunks.appendChild(item);
+                });
+
+                askResult.classList.remove('hidden');
+            } catch (error) {
+                askError.textContent = 'Network error while asking the question.';
+                askError.classList.remove('hidden');
+            }
+        });
+    </script>
 @endsection

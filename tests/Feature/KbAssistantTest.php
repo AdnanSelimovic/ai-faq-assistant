@@ -5,8 +5,12 @@ namespace Tests\Feature;
 use App\Models\KbDocument;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\DocumentTextExtractionResult;
+use App\Services\DocumentTextExtractorInterface;
 use App\Services\KbIndexer;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class KbAssistantTest extends TestCase
@@ -62,6 +66,92 @@ class KbAssistantTest extends TestCase
         $this->assertDatabaseHas('kb_documents', [
             'title' => 'Support FAQ',
         ]);
+    }
+
+    public function test_can_create_kb_document_from_upload(): void
+    {
+        $user = User::factory()->create();
+
+        Storage::fake('local');
+        $this->app->bind(DocumentTextExtractorInterface::class, function () {
+            return new class implements DocumentTextExtractorInterface {
+                public function extract(UploadedFile $file): DocumentTextExtractionResult
+                {
+                    return new DocumentTextExtractionResult('Extracted upload text.');
+                }
+            };
+        });
+
+        $response = $this->actingAs($user)->post('/kb/documents', [
+            'upload' => UploadedFile::fake()->create('Support Guide.pdf', 12, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect();
+
+        $document = KbDocument::firstOrFail();
+        $this->assertSame('upload', $document->source_type);
+        $this->assertSame('Support Guide', $document->title);
+        $this->assertSame('Extracted upload text.', $document->meta['raw_text']);
+        $this->assertSame('Support Guide.pdf', $document->meta['original_filename']);
+        $this->assertSame(strlen('Extracted upload text.'), $document->meta['size_bytes']);
+        $this->assertNull($document->source_ref);
+        $this->assertEmpty(Storage::disk('local')->allFiles());
+    }
+
+    public function test_raw_text_preferred_over_upload(): void
+    {
+        $user = User::factory()->create();
+
+        Storage::fake('local');
+        $this->app->bind(DocumentTextExtractorInterface::class, function () {
+            return new class implements DocumentTextExtractorInterface {
+                public function extract(UploadedFile $file): DocumentTextExtractionResult
+                {
+                    throw new \RuntimeException('Extractor should not be called when raw text is provided.');
+                }
+            };
+        });
+
+        $response = $this->actingAs($user)->post('/kb/documents', [
+            'title' => 'Manual Entry',
+            'source_type' => 'faq',
+            'raw_text' => 'Manual text wins.',
+            'upload' => UploadedFile::fake()->create('Ignored.pdf', 12, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect();
+
+        $document = KbDocument::firstOrFail();
+        $this->assertSame('faq', $document->source_type);
+        $this->assertSame('Manual text wins.', $document->meta['raw_text']);
+        $this->assertEmpty(Storage::disk('local')->allFiles());
+    }
+
+    public function test_can_index_document_created_from_upload(): void
+    {
+        $user = User::factory()->create();
+
+        Storage::fake('local');
+        $this->app->bind(DocumentTextExtractorInterface::class, function () {
+            return new class implements DocumentTextExtractorInterface {
+                public function extract(UploadedFile $file): DocumentTextExtractionResult
+                {
+                    return new DocumentTextExtractionResult(str_repeat('Chunked content. ', 120));
+                }
+            };
+        });
+
+        $response = $this->actingAs($user)->post('/kb/documents', [
+            'upload' => UploadedFile::fake()->create('Index.pdf', 12, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect();
+        $document = KbDocument::firstOrFail();
+
+        $this->actingAs($user)->post("/kb/documents/{$document->id}/index")
+            ->assertRedirect();
+
+        $this->assertGreaterThan(0, $document->chunks()->count());
     }
 
     public function test_can_index_document_and_chunks_exist(): void

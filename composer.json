@@ -9,7 +9,11 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.2",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "phpoffice/phppresentation": "^0.8.0",
+        "phpoffice/phpword": "^1.2",
+        "smalot/pdfparser": "^2.11",
+        "spatie/pdf-to-text": "^1.52"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

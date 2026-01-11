@@ -58,6 +58,12 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
+## KB document uploads
+
+The admin "Create Document" screen supports optional file uploads (PDF, DOCX, PPTX). If raw text is pasted, it takes priority and the upload is ignored. The file is only used for text extraction and is not stored.
+
+PDF extraction uses the `smalot/pdfparser` library and does not require external binaries.
+
 ## n8n Workflow #1: Webhook ingest -> create doc -> index
 
 Webhook input JSON:

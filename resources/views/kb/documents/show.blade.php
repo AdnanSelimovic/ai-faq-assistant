@@ -59,6 +59,42 @@
                         </dd>
                     </div>
                 </dl>
+                @if ($document->source_type === 'upload' && !empty($document->meta['original_filename']))
+                    <div class="mt-6 border-t border-zinc-200/70 pt-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-300">
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Upload metadata</h3>
+                        <dl class="mt-3 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <dt>Filename</dt>
+                                <dd class="font-medium text-zinc-900 dark:text-zinc-100">{{ $document->meta['original_filename'] }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <dt>MIME type</dt>
+                                <dd class="font-medium text-zinc-900 dark:text-zinc-100">{{ $document->meta['mime_type'] ?? 'n/a' }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <dt>Size</dt>
+                                <dd class="font-medium text-zinc-900 dark:text-zinc-100">
+                                    {{ number_format((int) ($document->meta['size_bytes'] ?? 0)) }} bytes
+                                </dd>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <dt>SHA256</dt>
+                                <dd class="truncate font-medium text-zinc-900 dark:text-zinc-100">{{ $document->meta['file_sha256'] ?? 'n/a' }}</dd>
+                            </div>
+                        </dl>
+                        <div class="mt-4">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Extracted preview</h4>
+                            <p class="mt-2 text-xs text-zinc-600 dark:text-zinc-300">
+                                {{ \Illuminate\Support\Str::limit($document->meta['raw_text'] ?? '', 400) }}
+                            </p>
+                            @if (!empty($document->meta['extraction_warnings']))
+                                <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                                    Warnings: {{ implode('; ', (array) $document->meta['extraction_warnings']) }}
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
                 <div class="mt-6">
                     <a
                         href="{{ route('kb.documents.index') }}"

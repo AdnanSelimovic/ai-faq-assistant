@@ -7,6 +7,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use App\Services\DocumentTextExtractor;
+use App\Services\DocumentTextExtractorInterface;
+use App\Services\DocumentTextExtractors\DocxTextExtractor;
+use App\Services\DocumentTextExtractors\PdfTextExtractor;
+use App\Services\DocumentTextExtractors\PptxTextExtractor;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,7 +20,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(DocumentTextExtractorInterface::class, function () {
+            return new DocumentTextExtractor(
+                new PdfTextExtractor(),
+                new DocxTextExtractor(),
+                new PptxTextExtractor(),
+            );
+        });
     }
 
     /**

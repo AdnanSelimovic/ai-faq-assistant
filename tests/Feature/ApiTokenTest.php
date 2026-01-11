@@ -20,6 +20,17 @@ class ApiTokenTest extends TestCase
         ]);
 
         $response->assertStatus(401);
+        $this->assertNotEquals(302, $response->status());
+        $this->assertStringContainsString('application/json', (string) $response->headers->get('Content-Type'));
+
+        $searchResponse = $this->postJson('/api/kb/search', [
+            'query' => 'support hours',
+            'limit' => 5,
+        ]);
+
+        $searchResponse->assertStatus(401);
+        $this->assertNotEquals(302, $searchResponse->status());
+        $this->assertStringContainsString('application/json', (string) $searchResponse->headers->get('Content-Type'));
     }
 
     public function test_can_create_index_and_search_with_token(): void
@@ -36,6 +47,7 @@ class ApiTokenTest extends TestCase
             ]);
 
         $createResponse->assertStatus(201);
+        $this->assertStringContainsString('application/json', (string) $createResponse->headers->get('Content-Type'));
         $documentId = $createResponse->json('id');
         $this->assertNotNull($documentId);
 
@@ -52,6 +64,7 @@ class ApiTokenTest extends TestCase
             ]);
 
         $searchResponse->assertStatus(200);
+        $this->assertStringContainsString('application/json', (string) $searchResponse->headers->get('Content-Type'));
         $searchResponse->assertJsonStructure([
             'data' => [
                 ['id', 'snippet', 'document_id', 'document_title'],

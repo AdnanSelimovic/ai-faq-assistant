@@ -4,8 +4,9 @@ use App\Http\Controllers\Api\KbDocumentApiController;
 use App\Http\Controllers\Api\KbSearchApiController;
 use App\Http\Controllers\ChatController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Middleware\ForceJsonResponse;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware([ForceJsonResponse::class, 'auth:sanctum'])->group(function () {
     Route::post('/kb/documents', [KbDocumentApiController::class, 'store']);
     Route::post('/kb/documents/{id}/index', [KbDocumentApiController::class, 'index']);
     Route::get('/kb/documents', [KbDocumentApiController::class, 'list']);

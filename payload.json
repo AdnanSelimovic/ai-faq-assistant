@@ -1,0 +1,6 @@
+{
+  "title": "Idempotency Demo",
+  "source_type": "n8n",
+  "source_ref": "demo-001",
+  "raw_text": "Support hours are 9-6 weekdays."
+}

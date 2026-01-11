@@ -7,6 +7,7 @@ use App\Models\KbDocument;
 use App\Services\KbIndexer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class KbDocumentApiController extends Controller
 {
@@ -46,6 +47,23 @@ class KbDocumentApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $idempotencyKey = $request->header('Idempotency-Key');
+        $userId = $request->user()?->id;
+        $route = 'api/kb/documents';
+
+        if ($idempotencyKey) {
+            $existing = DB::table('api_idempotency_keys')
+                ->where('user_id', $userId)
+                ->where('route', $route)
+                ->where('key', $idempotencyKey)
+                ->first();
+
+            if ($existing) {
+                $payload = json_decode($existing->response_json, true);
+                return response()->json($payload, 200);
+            }
+        }
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'source_type' => ['required', 'string', 'max:50'],
@@ -62,14 +80,29 @@ class KbDocumentApiController extends Controller
             ],
         ]);
 
-        return response()->json([
+        $response = [
             'id' => $document->id,
             'title' => $document->title,
             'source_type' => $document->source_type,
             'source_ref' => $document->source_ref,
             'status' => $document->status,
             'created_at' => $document->created_at,
-        ], 201);
+        ];
+
+        if ($idempotencyKey) {
+            DB::table('api_idempotency_keys')->insert([
+                'user_id' => $userId,
+                'route' => $route,
+                'key' => $idempotencyKey,
+                'request_hash' => hash('sha256', json_encode($validated)),
+                'response_json' => json_encode($response),
+                'status_code' => 201,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json($response, 201);
     }
 
     public function index(int $id, KbIndexer $indexer): JsonResponse

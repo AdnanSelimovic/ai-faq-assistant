@@ -57,3 +57,25 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## n8n Workflow #1: Webhook ingest -> create doc -> index
+
+Webhook input JSON:
+```json
+{
+  "title": "Test Doc",
+  "source_type": "n8n",
+  "source_ref": "demo",
+  "raw_text": "Support hours are 9-6 weekdays."
+}
+```
+
+HTTP Request node (create):
+- URL: `POST /api/kb/documents`
+- Authorization: `Bearer <token>`
+- Header: `Idempotency-Key: {{$json.idempotency_key}}`
+- Body: JSON payload above
+
+HTTP Request node (index):
+- URL: `POST /api/kb/documents/{id}/index`
+- Authorization: `Bearer <token>`

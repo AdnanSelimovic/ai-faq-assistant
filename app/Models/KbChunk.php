@@ -9,6 +9,16 @@ class KbChunk extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'document_id',
+        'chunk_index',
+        'content',
+        'content_hash',
+        'embedding',
+        'token_count',
+    ];
+
+
     /**
      * Get the document that owns the chunk.
      */

@@ -9,12 +9,21 @@ class KbDocument extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'title',
+        'source_type',
+        'source_ref',
+        'status',
+        'meta',
+    ];
+
+
     /**
      * Get the chunks for the document.
      */
     public function chunks()
     {
-        return $this->hasMany(KbChunk::class);
+        return $this->hasMany(KbChunk::class, 'document_id');
     }
 
     /**

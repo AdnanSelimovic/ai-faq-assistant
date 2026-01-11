@@ -9,6 +9,11 @@ class Conversation extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'title',
+    ];
+
+
     /**
      * Get the messages for the conversation.
      */

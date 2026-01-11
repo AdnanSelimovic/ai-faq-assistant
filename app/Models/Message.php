@@ -9,6 +9,17 @@ class Message extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'conversation_id',
+        'role',
+        'content',
+        'retrieved_chunk_ids',
+        'model',
+        'from_cache',
+        'latency_ms',
+    ];
+
+
     /**
      * Get the conversation that owns the message.
      */

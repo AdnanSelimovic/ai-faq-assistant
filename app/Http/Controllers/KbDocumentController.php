@@ -30,6 +30,75 @@ class KbDocumentController extends Controller
 
     public function store(Request $request, DocumentTextExtractorInterface $extractor): RedirectResponse
     {
+        $validated = $this->validateIngest($request);
+        $payload = $this->buildIngestPayload($request, $validated, $extractor);
+        if ($payload instanceof RedirectResponse) {
+            return $payload;
+        }
+
+        $document = KbDocument::create($payload);
+
+        return redirect()->route('kb.documents.show', $document);
+    }
+
+    public function edit(int $id): View
+    {
+        $document = KbDocument::findOrFail($id);
+
+        return view('kb.documents.edit', [
+            'document' => $document,
+        ]);
+    }
+
+    public function update(Request $request, int $id, DocumentTextExtractorInterface $extractor): RedirectResponse
+    {
+        $document = KbDocument::findOrFail($id);
+
+        $validated = $this->validateIngest($request);
+        $payload = $this->buildIngestPayload($request, $validated, $extractor);
+        if ($payload instanceof RedirectResponse) {
+            return $payload;
+        }
+
+        $document->update($payload);
+
+        return redirect()->route('kb.documents.show', $document);
+    }
+
+    public function destroy(int $id): RedirectResponse
+    {
+        $document = KbDocument::findOrFail($id);
+        $document->delete();
+
+        return redirect()->route('kb.documents.index');
+    }
+
+    public function show(int $id): View
+    {
+        $document = KbDocument::findOrFail($id);
+        $chunks = $document->chunks()
+            ->orderBy('chunk_index')
+            ->get();
+
+        return view('kb.documents.show', [
+            'document' => $document,
+            'chunks' => $chunks,
+        ]);
+    }
+
+    public function indexDocument(int $id, KbIndexer $indexer): RedirectResponse
+    {
+        $document = KbDocument::findOrFail($id);
+        $error = $indexer->index($document);
+        if ($error) {
+            return back()->withErrors(['index' => $error]);
+        }
+
+        return back();
+    }
+
+    private function validateIngest(Request $request): array
+    {
         $validator = validator($request->all(), [
             'title' => ['nullable', 'string', 'max:255'],
             'source_type' => ['nullable', 'string', 'max:50'],
@@ -56,22 +125,32 @@ class KbDocumentController extends Controller
             }
         });
 
-        $validated = $validator->validate();
+        return $validator->validate();
+    }
 
+    /**
+     * @return array<string, mixed>|RedirectResponse
+     */
+    private function buildIngestPayload(
+        Request $request,
+        array $validated,
+        DocumentTextExtractorInterface $extractor
+    ): array|RedirectResponse {
         if ($request->filled('raw_text')) {
-            $document = KbDocument::create([
+            return [
                 'title' => $validated['title'],
                 'source_type' => $validated['source_type'],
                 'source_ref' => $validated['source_ref'] ?? null,
                 'meta' => [
                     'raw_text' => $validated['raw_text'],
                 ],
-            ]);
-
-            return redirect()->route('kb.documents.show', $document);
+            ];
         }
 
         $upload = $request->file('upload');
+        if (!$upload) {
+            return back()->withErrors(['raw_text' => 'Provide raw text or upload a file.'])->withInput();
+        }
 
         try {
             $extraction = $extractor->extract($upload);
@@ -102,37 +181,11 @@ class KbDocumentController extends Controller
             $meta['extraction_warnings'] = $extraction->warnings;
         }
 
-        $document = KbDocument::create([
+        return [
             'title' => $title,
             'source_type' => 'upload',
             'source_ref' => null,
             'meta' => $meta,
-        ]);
-
-        return redirect()->route('kb.documents.show', $document);
-    }
-
-    public function show(int $id): View
-    {
-        $document = KbDocument::findOrFail($id);
-        $chunks = $document->chunks()
-            ->orderBy('chunk_index')
-            ->get();
-
-        return view('kb.documents.show', [
-            'document' => $document,
-            'chunks' => $chunks,
-        ]);
-    }
-
-    public function indexDocument(int $id, KbIndexer $indexer): RedirectResponse
-    {
-        $document = KbDocument::findOrFail($id);
-        $error = $indexer->index($document);
-        if ($error) {
-            return back()->withErrors(['index' => $error]);
-        }
-
-        return back();
+        ];
     }
 }

@@ -20,6 +20,22 @@
                 <span class="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                     Status: {{ $document->status }}
                 </span>
+                <a
+                    href="{{ route('kb.documents.edit', $document) }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                >
+                    Edit
+                </a>
+                <form method="POST" action="{{ route('kb.documents.destroy', $document) }}" onsubmit="return confirm('Delete this document? This cannot be undone.');">
+                    @csrf
+                    @method('DELETE')
+                    <button
+                        type="submit"
+                        class="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 shadow-sm transition hover:border-red-300 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950 dark:text-red-200"
+                    >
+                        Delete
+                    </button>
+                </form>
                 <form method="POST" action="{{ route('kb.documents.index-document', $document) }}">
                     @csrf
                     <x-button type="submit">Run indexing</x-button>

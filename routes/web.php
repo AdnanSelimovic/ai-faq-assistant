@@ -37,8 +37,14 @@ Route::middleware('auth')
             ->name('kb.documents.create');
         Route::post('/documents', [KbDocumentController::class, 'store'])
             ->name('kb.documents.store');
+        Route::get('/documents/{id}/edit', [KbDocumentController::class, 'edit'])
+            ->name('kb.documents.edit');
+        Route::patch('/documents/{id}', [KbDocumentController::class, 'update'])
+            ->name('kb.documents.update');
         Route::get('/documents/{id}', [KbDocumentController::class, 'show'])
             ->name('kb.documents.show');
+        Route::delete('/documents/{id}', [KbDocumentController::class, 'destroy'])
+            ->name('kb.documents.destroy');
         Route::post('/documents/{id}/index', [KbDocumentController::class, 'indexDocument'])
             ->name('kb.documents.index-document');
     });

@@ -178,6 +178,53 @@ class KbAssistantTest extends TestCase
         $this->assertGreaterThan(0, $document->chunks()->count());
     }
 
+    public function test_can_update_kb_document(): void
+    {
+        $user = User::factory()->create();
+        $document = KbDocument::create([
+            'title' => 'Original Title',
+            'source_type' => 'faq',
+            'source_ref' => 'internal/original',
+            'meta' => [
+                'raw_text' => 'Original text.',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->patch("/kb/documents/{$document->id}", [
+            'title' => 'Updated Title',
+            'source_type' => 'docs',
+            'source_ref' => 'internal/updated',
+            'raw_text' => 'Updated text.',
+        ]);
+
+        $response->assertRedirect();
+        $document->refresh();
+        $this->assertSame('Updated Title', $document->title);
+        $this->assertSame('docs', $document->source_type);
+        $this->assertSame('internal/updated', $document->source_ref);
+        $this->assertSame('Updated text.', $document->meta['raw_text']);
+    }
+
+    public function test_can_delete_kb_document(): void
+    {
+        $user = User::factory()->create();
+        $document = KbDocument::create([
+            'title' => 'Delete Me',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Delete text.',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->delete("/kb/documents/{$document->id}");
+
+        $response->assertRedirect('/kb/documents');
+        $this->assertDatabaseMissing('kb_documents', [
+            'id' => $document->id,
+        ]);
+    }
+
     public function test_can_ask_and_get_json_response(): void
     {
         $user = User::factory()->create();

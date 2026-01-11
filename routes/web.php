@@ -3,6 +3,8 @@
 use App\Http\Controllers\EmailLoginController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\KbDocumentController;
+use App\Http\Controllers\AskPreferenceController;
+use App\Services\AskModeResolver;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -18,8 +20,10 @@ Route::post('/logout', [EmailLoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
+Route::get('/dashboard', function (\Illuminate\Http\Request $request, AskModeResolver $resolver) {
+    return view('dashboard', [
+        'askMode' => $resolver->resolve($request),
+    ]);
 })
     ->middleware('auth')
     ->name('dashboard');
@@ -42,3 +46,7 @@ Route::middleware('auth')
 Route::post('/ask', [ChatController::class, 'ask'])
     ->middleware(['auth', 'throttle:ask'])
     ->name('chat.ask');
+
+Route::post('/preferences/ask-mode', [AskPreferenceController::class, 'store'])
+    ->middleware('auth')
+    ->name('preferences.ask-mode');

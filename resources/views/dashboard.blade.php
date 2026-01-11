@@ -25,6 +25,23 @@
                 <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                     Retrieval is enabled. Answers are placeholder until embeddings are wired up.
                 </p>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <label for="ask-mode" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Answer mode</label>
+                        <div class="mt-2">
+                            <select
+                                id="ask-mode"
+                                class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-100 dark:focus:ring-zinc-100/10"
+                            >
+                                <option value="extractive" @selected(($askMode ?? 'extractive') === 'extractive')>Extractive (no external calls)</option>
+                                <option value="llm" @selected(($askMode ?? 'extractive') === 'llm')>LLM (OpenAI)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                        <span id="ask-mode-status" class="hidden">Saved</span>
+                    </div>
+                </div>
                 <div class="mt-4">
                     <label for="question" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Question</label>
                     <div class="mt-2">
@@ -43,7 +60,7 @@
                     <div id="ask-result" class="mt-4 hidden space-y-3">
                         <div>
                             <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Answer</div>
-                            <p id="ask-answer" class="mt-2 text-sm text-zinc-700 dark:text-zinc-200"></p>
+                            <p id="ask-answer" class="mt-2 whitespace-pre-line text-sm text-zinc-700 dark:text-zinc-200"></p>
                         </div>
                         <details class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
                             <summary class="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -74,6 +91,8 @@
         const askResult = document.getElementById('ask-result');
         const askAnswer = document.getElementById('ask-answer');
         const askChunks = document.getElementById('ask-chunks');
+        const askModeSelect = document.getElementById('ask-mode');
+        const askModeStatus = document.getElementById('ask-mode-status');
 
         askButton.addEventListener('click', async () => {
             askError.classList.add('hidden');
@@ -127,6 +146,32 @@
                 askError.classList.remove('hidden');
                 askButton.removeAttribute('disabled');
                 askButtonText.textContent = 'Ask';
+            }
+        });
+
+        askModeSelect.addEventListener('change', async () => {
+            askModeStatus.classList.add('hidden');
+            const mode = askModeSelect.value;
+
+            try {
+                const response = await fetch('{{ route('preferences.ask-mode') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ mode }),
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                askModeStatus.textContent = 'Saved';
+                askModeStatus.classList.remove('hidden');
+                setTimeout(() => askModeStatus.classList.add('hidden'), 2000);
+            } catch (error) {
+                // Ignore preference save errors to avoid blocking ask flow.
             }
         });
     </script>

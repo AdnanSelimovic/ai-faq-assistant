@@ -64,6 +64,21 @@ The admin "Create Document" screen supports optional file uploads (PDF, DOCX, PP
 
 PDF extraction uses the `smalot/pdfparser` library and does not require external binaries.
 
+## Ask answer modes
+
+The dashboard Ask flow supports two modes:
+- `extractive` (default): summarizes top retrieved chunks without external calls and appends a Sources line.
+- `llm`: uses the OpenAI Responses API with retrieved chunks as context.
+
+The selected mode is stored in a `kb_ask_mode` cookie (set via an AJAX POST to `/preferences/ask-mode`) and remembered across sessions.
+
+Required env/config for LLM mode:
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (default `gpt-4o-mini`)
+- `OPENAI_STORE` (default false)
+- `ASK_MAX_CONTEXT_CHUNKS` (default 5)
+- `ASK_MAX_CONTEXT_CHARS` (default 4000)
+
 ## n8n Workflow #1: Webhook ingest -> create doc -> index
 
 Webhook input JSON:

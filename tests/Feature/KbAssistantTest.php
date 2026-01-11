@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Models\KbDocument;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\AskModeResolver;
 use App\Services\DocumentTextExtractionResult;
 use App\Services\DocumentTextExtractorInterface;
 use App\Services\KbIndexer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -202,14 +204,79 @@ class KbAssistantTest extends TestCase
             'chunks',
         ]);
         $this->assertNotEmpty($response->json('chunks'));
+        $this->assertStringContainsString('Sources:', $response->json('answer'));
 
         $this->assertDatabaseCount('messages', 2);
         $this->assertDatabaseHas('messages', [
             'role' => 'user',
             'content' => 'Support hours',
         ]);
-        $this->assertDatabaseHas('messages', [
-            'role' => 'assistant',
+        $assistantMessage = Message::where('role', 'assistant')->latest()->first();
+        $this->assertNotNull($assistantMessage);
+        $this->assertNotEmpty($assistantMessage->retrieved_chunk_ids);
+    }
+
+    public function test_llm_mode_uses_openai_response(): void
+    {
+        $user = User::factory()->create();
+
+        $document = KbDocument::create([
+            'title' => 'Ask LLM',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support hours are 9am to 6pm weekdays.',
+            ],
         ]);
+
+        $indexer = app(KbIndexer::class);
+        $indexer->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => "LLM answer.\nSources: #1",
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/ask', [
+            'question' => 'Support hours',
+        ]);
+
+        $response->assertOk();
+        $this->assertStringContainsString('LLM answer.', $response->json('answer'));
+
+        $assistantMessage = Message::where('role', 'assistant')->latest()->first();
+        $this->assertSame('test-model', $assistantMessage->model);
+        $this->assertNotNull($assistantMessage->latency_ms);
+    }
+
+    public function test_can_set_ask_mode_preference_cookie(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson('/preferences/ask-mode', [
+            'mode' => AskModeResolver::MODE_LLM,
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'ok' => true,
+            'mode' => AskModeResolver::MODE_LLM,
+        ]);
+        $response->assertCookie(AskModeResolver::COOKIE_NAME, AskModeResolver::MODE_LLM);
     }
 }

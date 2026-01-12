@@ -1,16 +1,15 @@
 # PROJECT HANDOFF SNAPSHOT
 
 ## Overview
-This is a single-user Laravel knowledge-base/FAQ assistant POC with an authenticated admin UI, KB document indexing into chunks, a dashboard ?Ask? flow that retrieves chunks and returns a placeholder answer, plus a Sanctum-protected JSON API layer for automation (n8n/MCP). No OpenAI/embeddings yet.
+This is a single-user Laravel knowledge-base/FAQ assistant POC with an authenticated admin UI, KB document indexing into chunks, a dashboard ?Ask? flow that retrieves chunks and returns a placeholder answer, plus a Sanctum-protected JSON API layer for automation (MCP). No OpenAI/embeddings yet.
 
 ## Working features (confirmed)
-- n8n workflow documentation: docs/n8n-workflow.md (local webhook -> create/index/search).
 - Auth flow (email-only gate): `/login` validates `SINGLE_USER_EMAIL`, creates/logs in a user, redirects to dashboard.
 - KB admin flow: list, create, show documents; index action generates chunks and updates status.
 - Indexing pipeline: chunking (~1000 chars, 120 overlap), sha256 hashes, transactional re-index (delete+insert), status/meta error updates.
 - Ask flow: dashboard fetch -> `/ask` -> retrieval (FULLTEXT or LIKE fallback) -> placeholder answer; user + assistant messages stored.
 - Rate limiting: `POST /login` (10/min per IP) and `POST /ask` (30/min per user/IP).
-- JSON API: token-authenticated endpoints for create/index/list/search (n8n/MCP-ready), plus optional `/api/ask`.
+- JSON API: token-authenticated endpoints for create/index/list/search (MCP-ready), plus optional `/api/ask`.
 - UI: shared layouts/components for consistent Tailwind styling; dashboard/KB pages use layouts.
 
 ## Key routes
@@ -90,4 +89,5 @@ php artisan serve
 - Login with `SINGLE_USER_EMAIL` and confirm you land on `/dashboard`.
 - Create a KB document, open it, click ?Run indexing,? and verify chunks appear.
 - Call `/api/kb/documents` with a token to verify JSON auth + idempotency.
+
 

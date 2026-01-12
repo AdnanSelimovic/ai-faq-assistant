@@ -58,6 +58,62 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
+## Deploying on Railway
+
+### Connect the repo
+1) Create a new Railway project and connect this repo.
+2) Railway will detect Laravel; keep the default builder.
+
+### Add MySQL
+1) Add the MySQL plugin in Railway.
+2) Copy the MySQL connection values into your environment variables.
+
+### Required environment variables
+Set these in Railway before deploy:
+- `APP_KEY` (generate locally with `php artisan key:generate --show`)
+- `APP_URL` (your Railway public URL)
+- `SINGLE_USER_EMAIL` (the only allowed login)
+- `DB_CONNECTION=mysql`
+- `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+
+Railway MySQL plugin mapping:
+- `MYSQLHOST` -> `DB_HOST`
+- `MYSQLPORT` -> `DB_PORT`
+- `MYSQLUSER` -> `DB_USERNAME`
+- `MYSQLPASSWORD` -> `DB_PASSWORD`
+- `MYSQLDATABASE` -> `DB_DATABASE`
+
+### Build and start commands
+- Build command:
+  - `composer install --no-dev --optimize-autoloader && npm ci && npm run build`
+- Start command:
+  - `php artisan serve --host=0.0.0.0 --port=$PORT`
+
+### Railway settings
+- Build command: `composer install --no-dev --optimize-autoloader && npm ci && npm run build`
+- Start command: `php artisan serve --host=0.0.0.0 --port=$PORT` (or keep the `Procfile`)
+- Pre-deploy command: `bash railway/init-app.sh` (or `bash railway/check-env.sh && bash railway/init-app.sh`)
+
+### Pre-deploy command
+- `bash railway/init-app.sh`
+
+### Script permissions
+If the scripts fail with "permission denied", run:
+`chmod +x railway/init-app.sh railway/check-env.sh`
+
+### Smoke tests
+1) Visit `/login` and sign in with `SINGLE_USER_EMAIL`.
+2) Create a KB document, open it, and click "Run indexing".
+3) Ask a question in the dashboard and confirm you get a response.
+
+### Deployment checklist
+- Connect Railway project
+- Add MySQL plugin
+- Copy env vars
+- Run migrations
+- Visit `/login` and test functionality
+- Verify API endpoints
+
 ## KB document uploads
 
 The admin "Create Document" screen supports optional file uploads (PDF, DOCX, PPTX). If raw text is pasted, it takes priority and the upload is ignored. The file is only used for text extraction and is not stored.

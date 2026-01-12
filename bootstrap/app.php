@@ -13,7 +13,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->replace(\Illuminate\Http\Middleware\TrustProxies::class, \App\Http\Middleware\TrustProxies::class);
         $middleware->prependToGroup('api', ForceJsonResponse::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

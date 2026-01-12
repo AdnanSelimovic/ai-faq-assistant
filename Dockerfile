@@ -37,7 +37,8 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 
 COPY . .
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache \
+    && chmod +x railway/start.sh
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
@@ -49,4 +50,4 @@ RUN npm run build
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+CMD ["bash", "railway/start.sh"]

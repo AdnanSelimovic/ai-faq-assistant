@@ -1,17 +1,21 @@
-FROM php:8.4-cli
+FROM php:8.4-cli-bookworm
 
 WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
+        pkg-config \
         unzip \
         zip \
+        zlib1g-dev \
         libzip-dev \
         libicu-dev \
+        libonig-dev \
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
+        ${PHPIZE_DEPS} \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \

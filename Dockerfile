@@ -47,6 +47,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 RUN npm run build
+RUN test -f public/build/manifest.json
 
 EXPOSE 8080
 

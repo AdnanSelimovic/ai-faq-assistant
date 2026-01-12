@@ -111,7 +111,7 @@
             }
 
             try {
-                const response = await fetch('{{ route('chat.ask') }}', {
+                const response = await fetch('/ask', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -154,7 +154,7 @@
             const mode = askModeSelect.value;
 
             try {
-                const response = await fetch('{{ route('preferences.ask-mode') }}', {
+                const response = await fetch('/preferences/ask-mode', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

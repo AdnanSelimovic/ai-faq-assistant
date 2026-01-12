@@ -33,13 +33,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+COPY . .
+
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY . .
 RUN npm run build
 
 EXPOSE 8000

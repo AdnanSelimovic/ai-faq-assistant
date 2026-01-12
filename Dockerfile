@@ -1,18 +1,17 @@
-FROM php:8.4-cli-alpine AS base
+FROM php:8.4-cli
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-        bash \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         git \
-        zip \
         unzip \
-        icu-dev \
-        oniguruma-dev \
+        zip \
         libzip-dev \
+        libicu-dev \
         libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
@@ -21,18 +20,14 @@ RUN apk add --no-cache \
         mbstring \
         pdo_mysql \
         zip \
-    && apk del --no-cache \
-        icu-dev \
-        oniguruma-dev \
-        libzip-dev \
-        libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-ENV NODE_VERSION=20.11.1
-RUN apk add --no-cache nodejs npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress

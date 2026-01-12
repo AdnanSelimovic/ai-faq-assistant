@@ -62,7 +62,7 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ### Connect the repo
 1) Create a new Railway project and connect this repo.
-2) Railway will detect Laravel; keep the default builder.
+2) Use the Nixpacks builder (or Auto that resolves to Nixpacks).
 
 ### Add MySQL
 1) Add the MySQL plugin in Railway.
@@ -82,6 +82,11 @@ Railway MySQL plugin mapping:
 - `MYSQLUSER` -> `DB_USERNAME`
 - `MYSQLPASSWORD` -> `DB_PASSWORD`
 - `MYSQLDATABASE` -> `DB_DATABASE`
+
+### PHP requirements
+- PHP 8.4 is required.
+- Extensions: `gd`, `zip`.
+- If `composer install` fails on Railway with missing extensions or PHP version, the `nixpacks.toml` in the repo forces PHP 8.4 and installs `gd` + `zip`.
 
 ### Build and start commands
 - Build command:

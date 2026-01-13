@@ -60,6 +60,45 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ## Deploying on Railway
 
+### Railway Manual Setup (UI steps)
+1) In your Railway project, create/add a new Database service and choose MySQL (per Railway database docs).
+2) Open the web service, go to Variables, and use the Raw Editor to paste the env block below. The MySQL service provides `MYSQL*` vars; reference them from the web service using Railway's `${{VAR_NAME}}` syntax.
+3) Generate a unique `APP_KEY` for production (run `php artisan key:generate --show` locally or in a trusted environment) and paste it; avoid reusing keys across unrelated deployments when possible.
+4) HTTPS gotcha: if the site is served via `https://` but you see `http://` asset URLs or form actions (e.g. `/logout`), set `APP_URL` and `ASSET_URL` to your Railway `https://` domain and redeploy.
+5) To stop the app/saving resources, use Railway's scaling/sleep controls in the service settings (see Railway runtime/scaling docs for your plan).
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://<your railway domain>
+ASSET_URL=https://<your railway domain>
+APP_KEY=<generate and paste>
+SINGLE_USER_EMAIL=<your email>
+
+DB_CONNECTION=mysql
+DB_HOST=${{MYSQLHOST}}
+DB_PORT=${{MYSQLPORT}}
+DB_DATABASE=${{MYSQLDATABASE}}
+DB_USERNAME=${{MYSQLUSER}}
+DB_PASSWORD=${{MYSQLPASSWORD}}
+
+# Optional but recommended
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
+
+# Optional OpenAI settings
+OPENAI_API_KEY=<your key>
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_MAX_OUTPUT_TOKENS=400
+```
+
+Smoke test:
+- Visit `/` and `/login`.
+- Sign in and confirm the dashboard loads with CSS.
+- Click “Log out” and ensure it works.
+- Confirm migrations completed (no migration errors on boot).
+
 ### Connect the repo
 1) Create a new Railway project and connect this repo.
 2) Use the Nixpacks builder (or Auto that resolves to Nixpacks).

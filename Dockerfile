@@ -35,17 +35,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts
+
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
+
 COPY . .
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache \
     && chmod +x railway/start.sh
 
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
+RUN php artisan package:discover --ansi
 RUN npm run build
 RUN test -f public/build/manifest.json
 

@@ -1,0 +1,268 @@
+{
+  "name": "AI FAQ Assistant - MCP/N8N Demo",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "railway_base_url",
+              "name": "railway_base_url",
+              "value": "https://YOUR-RAILWAY-DOMAIN",
+              "type": "string"
+            },
+            {
+              "id": "api_token",
+              "name": "api_token",
+              "value": "PASTE_SANCTUM_TOKEN",
+              "type": "string"
+            },
+            {
+              "id": "title",
+              "name": "title",
+              "value": "n8n Demo KB",
+              "type": "string"
+            },
+            {
+              "id": "source_type",
+              "name": "source_type",
+              "value": "n8n",
+              "type": "string"
+            },
+            {
+              "id": "source_ref",
+              "name": "source_ref",
+              "value": "n8n/demo",
+              "type": "string"
+            },
+            {
+              "id": "raw_text",
+              "name": "raw_text",
+              "value": "Support is available 24/7 for enterprise customers.",
+              "type": "string"
+            },
+            {
+              "id": "question",
+              "name": "question",
+              "value": "What support is available for enterprise customers?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set_demo_input",
+      "name": "Set Demo Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        450,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.railway_base_url + '/api/kb/documents' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + String($json.api_token).replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ { title: $json.title, source_type: $json.source_type, source_ref: $json.source_ref, raw_text: $json.raw_text } }}",
+        "options": {}
+      },
+      "id": "http_create_document",
+      "name": "Create Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node[\"Set Demo Input\"].json.railway_base_url + '/api/kb/documents/' + $json.id + '/index' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + String($node[\"Set Demo Input\"].json.api_token).replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http_index_document",
+      "name": "Index Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        950,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node[\"Set Demo Input\"].json.railway_base_url + '/api/ask' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + String($node[\"Set Demo Input\"].json.api_token).replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ { question: $node[\"Set Demo Input\"].json.question } }}",
+        "options": {}
+      },
+      "id": "http_ask",
+      "name": "Ask",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "question",
+              "name": "question",
+              "value": "={{ $node[\"Set Demo Input\"].json.question }}",
+              "type": "string"
+            },
+            {
+              "id": "answer",
+              "name": "answer",
+              "value": "={{ $json.answer }}",
+              "type": "string"
+            },
+            {
+              "id": "chunks_count",
+              "name": "chunks_count",
+              "value": "={{ ($json.chunks || []).length }}",
+              "type": "number"
+            },
+            {
+              "id": "retrieval_method",
+              "name": "retrieval_method",
+              "value": "={{ $json.retrieval?.method || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set_output",
+      "name": "Set Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1450,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Demo Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Demo Input": {
+      "main": [
+        [
+          {
+            "node": "Create Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document": {
+      "main": [
+        [
+          {
+            "node": "Index Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Index Document": {
+      "main": [
+        [
+          {
+            "node": "Ask",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask": {
+      "main": [
+        [
+          {
+            "node": "Set Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "active": false,
+  "pinData": {},
+  "meta": {},
+  "tags": []
+}

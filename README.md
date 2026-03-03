@@ -196,3 +196,13 @@ npm run mcp:serve
 ```
 
 Setup and demo evidence checklist: `docs/MCP_DEMO.md`.
+
+## n8n workflow
+
+Import-ready n8n workflow:
+
+- `docs/n8n/workflow.json`
+
+Runbook:
+
+- `docs/N8N_DEMO.md`

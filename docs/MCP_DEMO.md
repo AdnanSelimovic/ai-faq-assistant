@@ -1,6 +1,6 @@
-# MCP Demo Evidence Guide
+# MCP Demo Runbook
 
-Use this checklist to capture MCP evidence for submission/defense.
+Use this runbook to perform and explain the MCP part during submission/defense.
 
 ## 1. Setup
 
@@ -34,14 +34,26 @@ Register this server command in your MCP host client:
    - `kb_index_document`
    - `kb_ask` on inserted content
 
-## 4. Evidence to capture
-
-1. Screenshot: MCP server connected in host.
-2. Screenshot: successful `kb_list_documents` output.
-3. Screenshot: successful `kb_ask` output.
-4. Screenshot: optional create/index workflow.
-5. Include exact command/config snippet used.
-
-## 5. Security note (include in report)
+## 4. Security note (include in report)
 
 This MCP adapter uses Bearer token authentication against protected Laravel API routes (`auth:sanctum`).
+
+## 5. Defense demo script (text only)
+
+Use this exact sequence live:
+
+1. Start backend: `php artisan serve`
+2. Ensure MCP server is running in your host (Claude Local MCP servers).
+3. Call `kb_list_documents`.
+4. Call `kb_search` with query `support hours`.
+5. Call `kb_ask` with question `What are support hours?`.
+6. Optional lifecycle:
+   - `kb_create_document`
+   - `kb_index_document`
+   - `kb_ask` on the newly indexed content.
+
+Expected outcome:
+
+- MCP tools are callable from host.
+- Tool responses come from protected Laravel API routes.
+- Ask/search results are grounded in the project KB.

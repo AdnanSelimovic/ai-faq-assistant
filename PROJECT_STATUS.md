@@ -8,6 +8,8 @@ This is a single-user Laravel knowledge-base/FAQ assistant POC with an authentic
 - New per-chat page (`/chats/{id}`) shows full message history and submits asks scoped to that conversation.
 - Conversation-scoped ask route added: `POST /chats/{id}/ask`.
 - New UX polish: auto-chat titles from first user question, copy/regenerate actions, source jump links, typing-effect rendering, and dashboard chat filtering.
+- Full RAG pipeline enabled: indexing now writes chunk embeddings and ask/search now use vector retrieval with lexical fallback.
+- Retrieval quality tuning added: hybrid rank fusion (vector + lexical), minimum vector-score threshold, random+lexical candidate selection (not newest-only), and batched embedding generation.
 
 ## Working features (confirmed)
 - Auth flow (email-only gate): `/login` validates `SINGLE_USER_EMAIL`, creates/logs in a user, redirects to dashboard.

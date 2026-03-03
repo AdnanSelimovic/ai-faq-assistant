@@ -232,10 +232,16 @@
                         const link = document.createElement('a');
                         link.href = chunk.document_url;
                         link.className = 'underline hover:no-underline';
-                        link.textContent = `#${chunk.id} ${chunk.document_title ? `(${chunk.document_title})` : ''}`.trim();
+                        const shareLabel = chunk.relevance_share_pct !== null && chunk.relevance_share_pct !== undefined
+                            ? ` - ${Number(chunk.relevance_share_pct).toFixed(1)}% relevance`
+                            : '';
+                        link.textContent = `#${chunk.id} ${chunk.document_title ? `(${chunk.document_title})` : ''}${shareLabel}`.trim();
                         prefix.appendChild(link);
                     } else {
-                        prefix.textContent = `#${chunk.id}`;
+                        const shareLabel = chunk.relevance_share_pct !== null && chunk.relevance_share_pct !== undefined
+                            ? ` - ${Number(chunk.relevance_share_pct).toFixed(1)}% relevance`
+                            : '';
+                        prefix.textContent = `#${chunk.id}${shareLabel}`;
                     }
 
                     const text = document.createElement('div');

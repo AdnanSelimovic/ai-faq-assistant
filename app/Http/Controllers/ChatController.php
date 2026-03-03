@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\KbChunk;
 use App\Models\Message;
 use App\Services\AskModeResolver;
+use App\Services\RagRetriever;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -14,7 +15,12 @@ use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
-    public function ask(Request $request, AskModeResolver $modeResolver, ?Conversation $conversation = null): JsonResponse
+    public function ask(
+        Request $request,
+        AskModeResolver $modeResolver,
+        RagRetriever $retriever,
+        ?Conversation $conversation = null
+    ): JsonResponse
     {
         $validated = $request->validate([
             'question' => ['required', 'string', 'max:2000'],
@@ -36,38 +42,10 @@ class ChatController extends Controller
         }
 
         $query = $validated['question'];
-        $chunks = collect();
-
-        try {
-            $chunks = KbChunk::query()
-                ->with('document:id,title')
-                ->selectRaw('kb_chunks.*, MATCH(content) AGAINST(? IN NATURAL LANGUAGE MODE) AS score', [$query])
-                ->whereFullText('content', $query)
-                ->orderByDesc('score')
-                ->limit(5)
-                ->get();
-        } catch (\Throwable $e) {
-            $chunks = collect();
-        }
-
-        if ($chunks->isEmpty()) {
-            $terms = preg_split('/\s+/', strtolower(preg_replace('/[^a-z0-9\s]/i', ' ', $query)));
-            $terms = array_values(array_filter($terms, fn ($term) => strlen($term) > 2));
-
-            $chunks = KbChunk::query()
-                ->with('document:id,title')
-                ->when($terms, function ($builder) use ($terms) {
-                    $builder->where(function ($subQuery) use ($terms) {
-                        foreach ($terms as $term) {
-                            $subQuery->orWhere('content', 'like', '%' . $term . '%');
-                        }
-                    });
-                }, function ($builder) use ($query) {
-                    $builder->where('content', 'like', '%' . $query . '%');
-                })
-                ->limit(5)
-                ->get();
-        }
+        $retrievalQuery = $this->buildRetrievalQuery($query, $conversation, $userMessage->id);
+        $retrieval = $retriever->retrieve($retrievalQuery, 5);
+        $chunks = $retrieval['chunks'];
+        $retrievalMethod = $retrieval['method'];
 
         $chunkIds = $chunks->pluck('id')->all();
         $chunkSnippets = $chunks->map(function (KbChunk $chunk) {
@@ -80,6 +58,8 @@ class ChatController extends Controller
                 'document_id' => $documentId,
                 'document_title' => $chunk->document?->title,
                 'document_url' => $documentId ? route('kb.documents.show', $documentId) . '#chunk-' . $chunk->id : null,
+                'score' => $chunk->getAttribute('retrieval_score'),
+                'relevance_share_pct' => $chunk->getAttribute('relevance_share_pct'),
             ];
         })->all();
 
@@ -117,6 +97,11 @@ class ChatController extends Controller
         return response()->json([
             'answer' => $answer,
             'chunks' => $chunkSnippets,
+            'retrieval' => [
+                'method' => $retrievalMethod,
+                'count' => count($chunkSnippets),
+                'query_used' => $retrievalQuery,
+            ],
         ]);
     }
 
@@ -144,12 +129,10 @@ class ChatController extends Controller
 
         $bullets = $this->buildBullets($chunks);
         $quotes = $this->buildQuotes($chunks);
-        $sources = $this->buildSourcesLine($chunks);
 
         $answer = implode("\n", array_map(fn ($bullet) => '- ' . $bullet, $bullets));
         $answer .= "\n\nQuotes:\n";
         $answer .= implode("\n", array_map(fn ($quote) => '"' . $quote . '"', $quotes));
-        $answer .= "\n\n" . $sources;
 
         return $answer;
     }
@@ -205,21 +188,6 @@ class ChatController extends Controller
         return $quotes;
     }
 
-    private function buildSourcesLine(\Illuminate\Support\Collection $chunks): string
-    {
-        $sources = $chunks->map(function (KbChunk $chunk) {
-            $label = '#' . $chunk->id;
-            $title = $chunk->document?->title;
-            if ($title) {
-                $label .= ' (' . $title . ')';
-            }
-
-            return $label;
-        })->all();
-
-        return 'Sources: ' . implode(', ', $sources);
-    }
-
     /**
      * @return array<string, mixed>|null
      */
@@ -243,7 +211,7 @@ class ChatController extends Controller
         $history = empty($historyBlocks) ? '(none)' : implode("\n", $historyBlocks);
         $context = empty($contextBlocks) ? '(none)' : implode("\n\n", $contextBlocks);
         $input = "CHAT HISTORY:\n{$history}\n\nQUESTION:\n{$question}\n\nCONTEXT:\n{$context}";
-        $instructions = 'Use CHAT HISTORY for conversational continuity (for example, follow-up references to prior turns). Use CONTEXT for knowledge-base facts. If a factual answer is not present in CONTEXT, say you don\'t have enough information in the KB. End with Sources: <chunk ids>.';
+        $instructions = 'Use CHAT HISTORY for conversational continuity (for example, follow-up references to prior turns). Use CONTEXT for knowledge-base facts. If a factual answer is not present in CONTEXT, say you don\'t have enough information in the KB.';
 
         $start = microtime(true);
 
@@ -285,15 +253,99 @@ class ChatController extends Controller
             ];
         }
 
-        if (stripos($answer, 'Sources:') === false) {
-            $answer .= "\n\n" . $this->buildSourcesLine($chunks);
-        }
+        $answer = $this->stripSourcesMentions($answer);
 
         return [
             'answer' => $answer,
             'model' => config('ask.openai_model'),
             'latency_ms' => $latencyMs,
         ];
+    }
+
+    private function stripSourcesMentions(string $answer): string
+    {
+        $answerWithoutSources = preg_replace('/\s*Sources:\s*[^\r\n]*/i', '', $answer) ?? $answer;
+        return trim($answerWithoutSources);
+    }
+
+    private function buildRetrievalQuery(string $question, Conversation $conversation, int $currentUserMessageId): string
+    {
+        $question = trim($question);
+        if ($question === '') {
+            return $question;
+        }
+
+        $assistantMessages = $conversation->messages()
+            ->where('id', '<', $currentUserMessageId)
+            ->where('role', 'assistant')
+            ->latest('id')
+            ->limit(8)
+            ->get();
+
+        if ($assistantMessages->isNotEmpty()) {
+            foreach ($assistantMessages as $assistantMessage) {
+                $resolved = $this->resolveNumberedFollowUp($question, (string) $assistantMessage->content);
+                if ($resolved !== null) {
+                    return $resolved;
+                }
+            }
+        }
+
+        $lastAssistant = $assistantMessages->first();
+        if ($lastAssistant && $this->isShortFollowUpQuery($question)) {
+            return trim($question . ' ' . $this->cleanSnippet((string) $lastAssistant->content, 260));
+        }
+
+        return $question;
+    }
+
+    private function isShortFollowUpQuery(string $question): bool
+    {
+        $wordCount = count(array_filter(preg_split('/\s+/', trim($question)) ?: []));
+        return $wordCount <= 4 || strlen($question) <= 24;
+    }
+
+    private function resolveNumberedFollowUp(string $question, string $assistantContent): ?string
+    {
+        $number = null;
+        if (preg_match('/\b([1-9])\b/', $question, $digitMatch)) {
+            $number = (int) $digitMatch[1];
+        } else {
+            $wordToNumber = [
+                'first' => 1,
+                'second' => 2,
+                'third' => 3,
+                'fourth' => 4,
+                'fifth' => 5,
+                'sixth' => 6,
+                'seventh' => 7,
+                'eighth' => 8,
+                'ninth' => 9,
+            ];
+
+            foreach ($wordToNumber as $word => $value) {
+                if (stripos($question, $word) !== false) {
+                    $number = $value;
+                    break;
+                }
+            }
+        }
+
+        if ($number === null) {
+            return null;
+        }
+
+        $plain = strip_tags($assistantContent);
+        $plain = preg_replace('/[*_`>#]/', '', $plain) ?? $plain;
+
+        if (preg_match('/^\s*' . $number . '\.\s*(.+)$/im', $plain, $match)) {
+            $topic = trim((string) $match[1]);
+            if ($topic !== '') {
+                return $topic;
+            }
+        }
+
+        return null;
     }
 
     /**

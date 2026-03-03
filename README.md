@@ -153,7 +153,7 @@ PDF extraction uses the `smalot/pdfparser` library and does not require external
 ## Ask answer modes
 
 The dashboard Ask flow supports two modes:
-- `extractive` (default): summarizes top retrieved chunks without external calls and appends a Sources line.
+- `extractive` (default): summarizes top retrieved chunks without external calls.
 - `llm`: uses the OpenAI Responses API with retrieved chunks as context.
 
 The selected mode is stored in a `kb_ask_mode` cookie (set via an AJAX POST to `/preferences/ask-mode`) and remembered across sessions.
@@ -164,3 +164,17 @@ Required env/config for LLM mode:
 - `OPENAI_STORE` (default false)
 - `ASK_MAX_CONTEXT_CHUNKS` (default 5)
 - `ASK_MAX_CONTEXT_CHARS` (default 4000)
+
+## Retrieval (RAG) settings
+
+Indexing now generates embeddings for each chunk and ask/search uses vector similarity retrieval with lexical fallback.
+
+Key env/config options:
+- `ASK_EMBEDDING_DRIVER` (`local` by default, use `openai` for OpenAI embeddings)
+- `ASK_EMBEDDING_MODEL` (default `text-embedding-3-small`)
+- `ASK_EMBEDDING_DIMENSIONS` (default `256`, used by local driver)
+- `ASK_EMBEDDING_BATCH_SIZE` (default `50`, controls batch embedding calls while indexing)
+- `ASK_RETRIEVAL_MODE` (`hybrid` by default, supports `vector` and hybrid retrieval)
+- `ASK_HYBRID_VECTOR_WEIGHT` (default `0.7`, vector contribution in hybrid ranking)
+- `ASK_VECTOR_MIN_SCORE` (default `0.08`, minimum cosine score to accept vector-only retrieval)
+- `ASK_VECTOR_CANDIDATE_LIMIT` (default `300`)

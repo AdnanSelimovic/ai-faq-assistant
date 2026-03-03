@@ -4,11 +4,15 @@ namespace App\Services;
 
 use App\Models\KbChunk;
 use App\Models\KbDocument;
+use App\Services\Embeddings\EmbeddingGeneratorInterface;
 use Illuminate\Support\Facades\DB;
 
 class KbIndexer
 {
-    public function __construct(private TextChunker $chunker)
+    public function __construct(
+        private TextChunker $chunker,
+        private EmbeddingGeneratorInterface $embeddings,
+    )
     {
     }
 
@@ -32,18 +36,35 @@ class KbIndexer
                 $document->chunks()->delete();
 
                 $chunks = $this->chunker->chunk($rawText, 1000, 120);
+                $batchSize = max(1, (int) config('ask.embedding_batch_size', 50));
+                $vectors = [];
+                foreach (array_chunk($chunks, $batchSize) as $batch) {
+                    $batchVectors = $this->embeddings->embedMany($batch);
+                    if (count($batchVectors) !== count($batch)) {
+                        throw new \RuntimeException('Embedding generator returned an unexpected number of vectors.');
+                    }
+
+                    $vectors = array_merge($vectors, $batchVectors);
+                }
+
+                if (count($vectors) !== count($chunks)) {
+                    throw new \RuntimeException('Embedding generator returned an unexpected number of vectors.');
+                }
+
                 foreach ($chunks as $index => $content) {
                     KbChunk::create([
                         'document_id' => $document->id,
                         'chunk_index' => $index,
                         'content' => $content,
                         'content_hash' => hash('sha256', $content),
-                        'embedding' => null,
+                        'embedding' => $vectors[$index] ?? null,
                         'token_count' => null,
                     ]);
                 }
 
                 unset($meta['error']);
+                $meta['embedding_driver'] = config('ask.embedding_driver', 'local');
+                $meta['embedding_model'] = config('ask.embedding_model', 'text-embedding-3-small');
                 $document->update([
                     'status' => 'indexed',
                     'meta' => $meta,

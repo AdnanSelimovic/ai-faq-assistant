@@ -1,5 +1,5 @@
 {
-  "name": "AI FAQ Assistant - Full n8n RAG Demo",
+  "name": "AI FAQ Assistant - MCP/N8N Demo",
   "nodes": [
     {
       "parameters": {},
@@ -7,7 +7,10 @@
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [220, 300]
+      "position": [
+        220,
+        320
+      ]
     },
     {
       "parameters": {
@@ -16,7 +19,7 @@
             {
               "id": "title",
               "name": "title",
-              "value": "n8n RAG Demo Document",
+              "value": "n8n Demo KB",
               "type": "string"
             },
             {
@@ -28,25 +31,19 @@
             {
               "id": "source_ref",
               "name": "source_ref",
-              "value": "n8n/full-demo",
+              "value": "n8n/demo",
               "type": "string"
             },
             {
               "id": "raw_text",
               "name": "raw_text",
-              "value": "N8N Demo Policy (marker N8N-RUN-ALPHA-90210): Enterprise support is available 24/7. For SEV-1 incidents, first response target is within 15 minutes. Billing changes require admin approval.",
-              "type": "string"
-            },
-            {
-              "id": "search_query",
-              "name": "search_query",
-              "value": "N8N-RUN-ALPHA-90210 SEV-1 response",
+              "value": "Support is available 24/7 for enterprise customers.",
               "type": "string"
             },
             {
               "id": "question",
               "name": "question",
-              "value": "In marker N8N-RUN-ALPHA-90210 policy, what is the SEV-1 first response target?",
+              "value": "What support is available for enterprise customers?",
               "type": "string"
             }
           ]
@@ -57,7 +54,10 @@
       "name": "Set Demo Input",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [450, 300]
+      "position": [
+        450,
+        320
+      ]
     },
     {
       "parameters": {
@@ -70,6 +70,10 @@
             {
               "name": "Authorization",
               "value": "={{ 'Bearer ' + String($vars.API_TOKEN || '').replace(/^\\s*Bearer\\s+/i, '').replace(/\\\\n/g, '|').replace(/\\r?\\n/g, '|').replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').replace(/\\s+/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
@@ -101,7 +105,10 @@
       "name": "Create Document",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 300]
+      "position": [
+        700,
+        320
+      ]
     },
     {
       "parameters": {
@@ -114,6 +121,10 @@
             {
               "name": "Authorization",
               "value": "={{ 'Bearer ' + String($vars.API_TOKEN || '').replace(/^\\s*Bearer\\s+/i, '').replace(/\\\\n/g, '|').replace(/\\r?\\n/g, '|').replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').replace(/\\s+/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
@@ -123,43 +134,10 @@
       "name": "Index Document",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [950, 300]
-    },
-    {
-      "parameters": {
-        "authentication": "none",
-        "method": "POST",
-        "url": "={{ String($vars.RAILWAY_BASE_URL || '').replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').trim().replace(/\\/+$/, '') + '/api/kb/search' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + String($vars.API_TOKEN || '').replace(/^\\s*Bearer\\s+/i, '').replace(/\\\\n/g, '|').replace(/\\r?\\n/g, '|').replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').replace(/\\s+/g, '').trim() }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "form-urlencoded",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "query",
-              "value": "={{ $node[\"Set Demo Input\"].json.search_query }}"
-            },
-            {
-              "name": "limit",
-              "value": "5"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "http_search",
-      "name": "Search",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1200, 300]
+      "position": [
+        950,
+        320
+      ]
     },
     {
       "parameters": {
@@ -172,6 +150,10 @@
             {
               "name": "Authorization",
               "value": "={{ 'Bearer ' + String($vars.API_TOKEN || '').replace(/^\\s*Bearer\\s+/i, '').replace(/\\\\n/g, '|').replace(/\\r?\\n/g, '|').replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, '').replace(/[^\\x20-\\x7E]/g, '').replace(/\\s+/g, '').trim() }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
@@ -191,54 +173,15 @@
       "name": "Ask",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1450, 300]
+      "position": [
+        1200,
+        320
+      ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "created_document_id",
-              "name": "created_document_id",
-              "value": "={{ $node[\"Create Document\"].json.id }}",
-              "type": "number"
-            },
-            {
-              "id": "created_document_title",
-              "name": "created_document_title",
-              "value": "={{ $node[\"Create Document\"].json.title }}",
-              "type": "string"
-            },
-            {
-              "id": "index_status",
-              "name": "index_status",
-              "value": "={{ $node[\"Index Document\"].json.status }}",
-              "type": "string"
-            },
-            {
-              "id": "search_retrieval_method",
-              "name": "search_retrieval_method",
-              "value": "={{ $node[\"Search\"].json.retrieval?.method || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "search_results_count",
-              "name": "search_results_count",
-              "value": "={{ ($node[\"Search\"].json.data || []).length }}",
-              "type": "number"
-            },
-            {
-              "id": "top_search_document_title",
-              "name": "top_search_document_title",
-              "value": "={{ $node[\"Search\"].json.data?.[0]?.document_title || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "top_search_snippet",
-              "name": "top_search_snippet",
-              "value": "={{ $node[\"Search\"].json.data?.[0]?.snippet || '' }}",
-              "type": "string"
-            },
             {
               "id": "question",
               "name": "question",
@@ -248,19 +191,19 @@
             {
               "id": "answer",
               "name": "answer",
-              "value": "={{ $node[\"Ask\"].json.answer || '' }}",
+              "value": "={{ $json.answer }}",
               "type": "string"
             },
             {
-              "id": "ask_chunks_count",
-              "name": "ask_chunks_count",
-              "value": "={{ ($node[\"Ask\"].json.chunks || []).length }}",
+              "id": "chunks_count",
+              "name": "chunks_count",
+              "value": "={{ ($json.chunks || []).length }}",
               "type": "number"
             },
             {
-              "id": "ask_retrieval_method",
-              "name": "ask_retrieval_method",
-              "value": "={{ $node[\"Ask\"].json.retrieval?.method || '' }}",
+              "id": "retrieval_method",
+              "name": "retrieval_method",
+              "value": "={{ $json.retrieval?.method || '' }}",
               "type": "string"
             }
           ]
@@ -271,7 +214,10 @@
       "name": "Set Output",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1700, 300]
+      "position": [
+        1450,
+        320
+      ]
     }
   ],
   "connections": {
@@ -309,17 +255,6 @@
       ]
     },
     "Index Document": {
-      "main": [
-        [
-          {
-            "node": "Search",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Search": {
       "main": [
         [
           {

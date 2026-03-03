@@ -199,9 +199,15 @@ Setup and demo evidence checklist: `docs/MCP_DEMO.md`.
 
 ## n8n workflow
 
-Import-ready n8n workflow:
+Import-ready n8n workflows:
 
 - `docs/n8n/workflow.json`
+- `docs/n8n/workflow.backup.json` (previous simpler flow)
+
+Current workflow expects n8n workflow variables:
+
+- `RAILWAY_BASE_URL`
+- `API_TOKEN`
 
 Runbook:
 

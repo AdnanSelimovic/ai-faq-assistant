@@ -16,13 +16,13 @@
             <div class="flex items-center gap-2">
                 <a
                     href="{{ route('dashboard') }}"
-                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 >
                     Back to chats
                 </a>
                 <a
                     href="{{ route('kb.documents.index') }}"
-                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 >
                     Knowledge base
                 </a>
@@ -46,10 +46,37 @@
             </div>
 
             <div id="messages" class="max-h-[28rem] space-y-3 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                @php
+                    $lastAssistantId = optional($messages->where('role', 'assistant')->last())->id;
+                @endphp
                 @forelse ($messages as $message)
                     <div class="rounded-lg border px-3 py-2 {{ $message->role === 'assistant' ? 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/40' }}">
                         <div class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ $message->role }}</div>
                         <p class="mt-1 whitespace-pre-line text-sm text-zinc-700 dark:text-zinc-200">{{ $message->content }}</p>
+                        @if ($message->role === 'assistant')
+                            <div class="mt-2 flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="assistant-copy inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 disabled:cursor-not-allowed"
+                                >
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <rect x="7" y="6" width="9" height="11" rx="1.5"></rect>
+                                        <path d="M5 14H4a1 1 0 0 1-1-1V4.5A1.5 1.5 0 0 1 4.5 3H12a1 1 0 0 1 1 1v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button
+                                    type="button"
+                                    class="assistant-regenerate cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 disabled:cursor-not-allowed {{ $message->id === $lastAssistantId ? 'inline-flex' : 'hidden' }}"
+                                >
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <path d="M16 10a6 6 0 1 1-1.76-4.24"></path>
+                                        <path d="M16 4.5V9h-4.5"></path>
+                                    </svg>
+                                    Regenerate
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 @empty
                     <div id="empty-state" class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -68,25 +95,9 @@
                     ></x-textarea>
                 </div>
                 <div class="mt-4 flex justify-end">
-                    <div class="flex items-center gap-2">
-                        <button
-                            type="button"
-                            id="copy-last-answer"
-                            class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
-                        >
-                            Copy answer
-                        </button>
-                        <button
-                            type="button"
-                            id="regenerate-answer"
-                            class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
-                        >
-                            Regenerate
-                        </button>
-                        <x-button type="button" id="ask-button">
-                            <span id="ask-button-text">Send</span>
-                        </x-button>
-                    </div>
+                    <x-button type="button" id="ask-button">
+                        <span id="ask-button-text">Send</span>
+                    </x-button>
                 </div>
                 <div id="chat-action-status" class="mt-2 hidden text-xs text-zinc-500 dark:text-zinc-400"></div>
                 <div id="ask-error" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></div>
@@ -111,9 +122,8 @@
         const askChunks = document.getElementById('ask-chunks');
         const askModeSelect = document.getElementById('ask-mode');
         const askModeStatus = document.getElementById('ask-mode-status');
-        const copyLastAnswerButton = document.getElementById('copy-last-answer');
-        const regenerateButton = document.getElementById('regenerate-answer');
         const actionStatus = document.getElementById('chat-action-status');
+        let typingAutoScrollTimer = null;
 
         const messageState = @json($messages->map(fn ($message) => [
             'role' => $message->role,
@@ -122,8 +132,9 @@
 
         function setBusy(isBusy) {
             askButton.toggleAttribute('disabled', isBusy);
-            copyLastAnswerButton.toggleAttribute('disabled', isBusy);
-            regenerateButton.toggleAttribute('disabled', isBusy);
+            messagesContainer.querySelectorAll('.assistant-copy, .assistant-regenerate').forEach((button) => {
+                button.toggleAttribute('disabled', isBusy);
+            });
             askButtonText.textContent = isBusy ? 'Sending...' : 'Send';
         }
 
@@ -145,6 +156,37 @@
             wrapper.appendChild(role);
             wrapper.appendChild(content);
 
+            if (isAssistant) {
+                const actions = document.createElement('div');
+                actions.className = 'mt-2 flex items-center gap-2';
+
+                const copyButton = document.createElement('button');
+                copyButton.type = 'button';
+                copyButton.className = 'assistant-copy inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 disabled:cursor-not-allowed';
+                copyButton.innerHTML = `
+                    <svg class="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <rect x="7" y="6" width="9" height="11" rx="1.5"></rect>
+                        <path d="M5 14H4a1 1 0 0 1-1-1V4.5A1.5 1.5 0 0 1 4.5 3H12a1 1 0 0 1 1 1v1"></path>
+                    </svg>
+                    Copy
+                `;
+
+                const regenerateButton = document.createElement('button');
+                regenerateButton.type = 'button';
+                regenerateButton.className = 'assistant-regenerate hidden cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 disabled:cursor-not-allowed';
+                regenerateButton.innerHTML = `
+                    <svg class="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <path d="M16 10a6 6 0 1 1-1.76-4.24"></path>
+                        <path d="M16 4.5V9h-4.5"></path>
+                    </svg>
+                    Regenerate
+                `;
+
+                actions.appendChild(copyButton);
+                actions.appendChild(regenerateButton);
+                wrapper.appendChild(actions);
+            }
+
             return { wrapper, content };
         }
 
@@ -155,20 +197,52 @@
 
             const { wrapper, content } = createMessageElement(message);
             messagesContainer.appendChild(wrapper);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            scrollMessagesToBottom();
 
             return content;
         }
 
+        function scrollMessagesToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function startTypingAutoScroll() {
+            stopTypingAutoScroll();
+            typingAutoScrollTimer = setInterval(() => {
+                scrollMessagesToBottom();
+            }, 16);
+        }
+
+        function stopTypingAutoScroll() {
+            if (typingAutoScrollTimer !== null) {
+                clearInterval(typingAutoScrollTimer);
+                typingAutoScrollTimer = null;
+            }
+        }
+
+        function updateAssistantActionButtons() {
+            const regenerateButtons = Array.from(messagesContainer.querySelectorAll('.assistant-regenerate'));
+            regenerateButtons.forEach((button, index) => {
+                const isLast = index === regenerateButtons.length - 1;
+                button.classList.toggle('hidden', !isLast);
+                button.classList.toggle('inline-flex', isLast);
+            });
+        }
+
         async function typeText(target, text) {
             target.textContent = '';
+            startTypingAutoScroll();
 
             for (let index = 0; index < text.length; index += 1) {
                 target.textContent += text[index];
+                scrollMessagesToBottom();
                 if (index % 3 === 0) {
                     await new Promise((resolve) => setTimeout(resolve, 8));
                 }
             }
+
+            stopTypingAutoScroll();
+            scrollMessagesToBottom();
         }
 
         function getLastMessageByRole(role) {
@@ -222,6 +296,7 @@
                 const assistantTarget = appendMessage({ role: 'assistant', content: '' });
                 await typeText(assistantTarget, assistantMessage.content);
                 messageState.push(assistantMessage);
+                updateAssistantActionButtons();
 
                 (payload.chunks || []).forEach((chunk) => {
                     const item = document.createElement('div');
@@ -270,34 +345,45 @@
             await askQuestion(questionInput.value.trim());
         });
 
-        copyLastAnswerButton.addEventListener('click', async () => {
-            const lastAssistantMessage = getLastMessageByRole('assistant');
-            if (!lastAssistantMessage || !lastAssistantMessage.content) {
-                actionStatus.textContent = 'No assistant answer to copy yet.';
-                actionStatus.classList.remove('hidden');
+        messagesContainer.addEventListener('click', async (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
                 return;
             }
 
-            try {
-                await navigator.clipboard.writeText(lastAssistantMessage.content);
-                actionStatus.textContent = 'Copied last answer.';
-                actionStatus.classList.remove('hidden');
-            } catch (error) {
-                actionStatus.textContent = 'Copy failed in this browser context.';
-                actionStatus.classList.remove('hidden');
-            }
-        });
+            if (target.classList.contains('assistant-copy')) {
+                const messageCard = target.closest('div.rounded-lg.border');
+                const textNode = messageCard ? messageCard.querySelector('p') : null;
+                const text = textNode ? textNode.textContent || '' : '';
+                if (!text.trim()) {
+                    actionStatus.textContent = 'No assistant answer to copy yet.';
+                    actionStatus.classList.remove('hidden');
+                    return;
+                }
 
-        regenerateButton.addEventListener('click', async () => {
-            const lastUserMessage = getLastMessageByRole('user');
-            if (!lastUserMessage || !lastUserMessage.content) {
-                actionStatus.textContent = 'No previous user message to regenerate.';
-                actionStatus.classList.remove('hidden');
+                try {
+                    await navigator.clipboard.writeText(text);
+                    actionStatus.textContent = 'Copied answer.';
+                    actionStatus.classList.remove('hidden');
+                } catch (error) {
+                    actionStatus.textContent = 'Copy failed in this browser context.';
+                    actionStatus.classList.remove('hidden');
+                }
+
                 return;
             }
 
-            questionInput.value = lastUserMessage.content;
-            await askQuestion(lastUserMessage.content);
+            if (target.classList.contains('assistant-regenerate')) {
+                const lastUserMessage = getLastMessageByRole('user');
+                if (!lastUserMessage || !lastUserMessage.content) {
+                    actionStatus.textContent = 'No previous user message to regenerate.';
+                    actionStatus.classList.remove('hidden');
+                    return;
+                }
+
+                questionInput.value = lastUserMessage.content;
+                await askQuestion(lastUserMessage.content);
+            }
         });
 
         askModeSelect.addEventListener('change', async () => {
@@ -324,5 +410,14 @@
                 // Ignore preference save errors to avoid blocking chat flow.
             }
         });
+
+        requestAnimationFrame(() => {
+            scrollMessagesToBottom();
+            requestAnimationFrame(() => {
+                scrollMessagesToBottom();
+            });
+        });
+
+        updateAssistantActionButtons();
     </script>
 @endsection

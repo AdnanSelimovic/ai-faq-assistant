@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Conversation;
 use App\Models\KbDocument;
 use App\Models\Message;
 use App\Models\User;
@@ -249,9 +250,13 @@ class KbAssistantTest extends TestCase
         $response->assertJsonStructure([
             'answer',
             'chunks',
+            'retrieval' => ['method', 'count'],
         ]);
         $this->assertNotEmpty($response->json('chunks'));
-        $this->assertStringContainsString('Sources:', $response->json('answer'));
+        $this->assertStringNotContainsString('Sources:', (string) $response->json('answer'));
+        $this->assertSame('hybrid', $response->json('retrieval.method'));
+        $this->assertNotNull($response->json('chunks.0.score'));
+        $this->assertNotNull($response->json('chunks.0.relevance_share_pct'));
 
         $this->assertDatabaseCount('messages', 2);
         $this->assertDatabaseHas('messages', [
@@ -261,6 +266,120 @@ class KbAssistantTest extends TestCase
         $assistantMessage = Message::where('role', 'assistant')->latest()->first();
         $this->assertNotNull($assistantMessage);
         $this->assertNotEmpty($assistantMessage->retrieved_chunk_ids);
+    }
+
+    public function test_dashboard_lists_conversations_and_chat_page_shows_messages(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'title' => 'Support chat',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Hello',
+        ]);
+
+        $dashboard = $this->actingAs($user)->get('/dashboard');
+        $dashboard->assertOk();
+        $dashboard->assertSee('Support chat');
+
+        $chat = $this->actingAs($user)->get("/chats/{$conversation->id}");
+        $chat->assertOk();
+        $chat->assertSee('Hello');
+    }
+
+    public function test_chat_ask_route_stores_messages_in_selected_conversation(): void
+    {
+        $user = User::factory()->create();
+        $conversationA = Conversation::create(['title' => 'Chat A']);
+        $conversationB = Conversation::create(['title' => 'Chat B']);
+
+        $document = KbDocument::create([
+            'title' => 'Ask Test',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support hours are 9am to 6pm weekdays.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversationA->id}/ask", [
+            'question' => 'Support hours',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(2, Message::where('conversation_id', $conversationA->id)->count());
+        $this->assertSame(0, Message::where('conversation_id', $conversationB->id)->count());
+    }
+
+    public function test_first_user_message_auto_titles_new_chat(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'New chat']);
+        $document = KbDocument::create([
+            'title' => 'Support FAQ',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support is available weekdays from 9am to 6pm.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'Tell me the support schedule for weekdays please',
+        ])->assertOk();
+
+        $conversation->refresh();
+        $this->assertSame('Tell me the support schedule for weekdays please', $conversation->title);
+    }
+
+    public function test_indexing_persists_chunk_embeddings_for_rag_retrieval(): void
+    {
+        $user = User::factory()->create();
+        $document = KbDocument::create([
+            'title' => 'Embedding Test',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => str_repeat('Billing invoices are issued monthly. ', 80),
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->post("/kb/documents/{$document->id}/index");
+        $response->assertRedirect();
+
+        $chunk = $document->chunks()->first();
+        $this->assertNotNull($chunk);
+        $this->assertIsArray($chunk->embedding);
+        $this->assertNotEmpty($chunk->embedding);
+    }
+
+    public function test_ask_response_contains_source_jump_link_data(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'Source Links']);
+        $document = KbDocument::create([
+            'title' => 'Billing FAQ',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Invoices are generated on the first business day of each month.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'When are invoices generated?',
+        ]);
+
+        $response->assertOk();
+        $chunks = $response->json('chunks');
+        $this->assertNotEmpty($chunks);
+        $this->assertSame($document->id, $chunks[0]['document_id'] ?? null);
+        $this->assertStringContainsString('/kb/documents/' . $document->id . '#chunk-', (string) ($chunks[0]['document_url'] ?? ''));
     }
 
     public function test_llm_mode_uses_openai_response(): void
@@ -325,5 +444,267 @@ class KbAssistantTest extends TestCase
             'mode' => AskModeResolver::MODE_LLM,
         ]);
         $response->assertCookie(AskModeResolver::COOKIE_NAME, AskModeResolver::MODE_LLM);
+    }
+
+    public function test_llm_mode_includes_prior_chat_history_in_prompt(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'title' => 'History Test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'How late is support available?',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Support is available 9am-6pm on weekdays.',
+        ]);
+
+        $document = KbDocument::create([
+            'title' => 'Support Hours',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Standard support is available Monday through Friday, 9:00 AM to 6:00 PM.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => "Your previous question was about support availability.\nSources: #1",
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'What question did I ask last time?',
+        ]);
+
+        $response->assertOk();
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            if ((string) $request->url() !== 'https://api.openai.com/v1/responses') {
+                return false;
+            }
+
+            $payload = $request->data();
+            $input = (string) ($payload['input'] ?? '');
+
+            return str_contains($input, 'CHAT HISTORY:')
+                && str_contains($input, 'user: How late is support available?')
+                && str_contains($input, 'assistant: Support is available 9am-6pm on weekdays.');
+        });
+    }
+
+    public function test_llm_mode_replaces_placeholder_sources_with_real_chunk_ids(): void
+    {
+        $user = User::factory()->create();
+
+        $document = KbDocument::create([
+            'title' => 'Support Hours',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support hours are Monday to Friday from 9:00 AM to 6:00 PM.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => "Support is weekdays.\n\nSources: <chunk ids>.",
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/ask', [
+            'question' => 'When is support available?',
+        ]);
+
+        $response->assertOk();
+        $answer = (string) $response->json('answer');
+        $this->assertStringNotContainsString('<chunk ids>', $answer);
+        $this->assertStringNotContainsString('Sources:', $answer);
+    }
+
+    public function test_llm_mode_removes_inline_sources_placeholder(): void
+    {
+        $user = User::factory()->create();
+
+        $document = KbDocument::create([
+            'title' => 'Security FAQ',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Customer data is encrypted in transit and at rest.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => 'Encryption at rest is essential. Sources: <chunk ids>.',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/ask', [
+            'question' => 'Is customer data encrypted in transit and at rest?',
+        ]);
+
+        $response->assertOk();
+        $answer = (string) $response->json('answer');
+        $this->assertStringNotContainsString('<chunk ids>', $answer);
+        $this->assertStringNotContainsString('Sources: <chunk ids>', $answer);
+        $this->assertStringNotContainsString('Sources:', $answer);
+    }
+
+    public function test_llm_mode_resolves_numbered_follow_up_for_retrieval_sources(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'Numbered follow-up']);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => "Your knowledge base includes:\n1. Support Hours and SLA\n2. Data Retention and Security\n3. Billing and Invoices\n4. Knowledge Base Formatting Guide",
+        ]);
+
+        $document = KbDocument::create([
+            'title' => 'Billing and Invoices',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Invoices are generated on the first business day of each month. We support credit card and ACH.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => 'Billing is important.',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => '3 please',
+        ]);
+
+        $response->assertOk();
+        $this->assertGreaterThan(0, (int) $response->json('retrieval.count'));
+        $this->assertSame('Billing and Invoices', $response->json('retrieval.query_used'));
+        $this->assertStringNotContainsString('Sources:', (string) $response->json('answer'));
+    }
+
+    public function test_llm_mode_resolves_numbered_follow_up_from_earlier_assistant_list(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'Earlier list follow-up']);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => "Topics:\n1. Support Hours and SLA\n2. Data Retention and Security\n3. Billing and Invoices\n4. Knowledge Base Formatting Guide",
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Data retention matters because encryption protects customer information.',
+        ]);
+
+        $document = KbDocument::create([
+            'title' => 'Billing and Invoices',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Invoices are generated monthly and refunds are available in the first 30 days.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => 'Billing information follows.',
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => '3 please',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('Billing and Invoices', $response->json('retrieval.query_used'));
+        $this->assertStringNotContainsString('Sources:', (string) $response->json('answer'));
     }
 }

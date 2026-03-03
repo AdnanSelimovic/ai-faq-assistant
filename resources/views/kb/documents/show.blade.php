@@ -22,7 +22,7 @@
                 </span>
                 <a
                     href="{{ route('kb.documents.edit', $document) }}"
-                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                    class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 >
                     Edit
                 </a>
@@ -129,7 +129,7 @@
             </div>
             <div class="mt-4 space-y-4">
                 @forelse ($chunks as $chunk)
-                    <div class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                    <div id="chunk-{{ $chunk->id }}" class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                                 Chunk {{ $chunk->chunk_index }}

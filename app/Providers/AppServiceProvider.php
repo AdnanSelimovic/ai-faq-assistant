@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use App\Services\DocumentTextExtractor;
 use App\Services\DocumentTextExtractorInterface;
+use App\Services\Embeddings\EmbeddingGeneratorInterface;
+use App\Services\Embeddings\LocalEmbeddingGenerator;
+use App\Services\Embeddings\OpenAiEmbeddingGenerator;
 use App\Services\DocumentTextExtractors\DocxTextExtractor;
 use App\Services\DocumentTextExtractors\PdfTextExtractor;
 use App\Services\DocumentTextExtractors\PptxTextExtractor;
@@ -26,6 +29,18 @@ class AppServiceProvider extends ServiceProvider
                 new DocxTextExtractor(),
                 new PptxTextExtractor(),
             );
+        });
+
+        $this->app->bind(EmbeddingGeneratorInterface::class, function () {
+            $driver = (string) config('ask.embedding_driver', 'local');
+            if ($driver === 'openai') {
+                $apiKey = (string) config('ask.openai_api_key');
+                $model = (string) config('ask.embedding_model', 'text-embedding-3-small');
+                return new OpenAiEmbeddingGenerator($apiKey, $model);
+            }
+
+            $dimensions = (int) config('ask.embedding_dimensions', 256);
+            return new LocalEmbeddingGenerator($dimensions);
         });
     }
 

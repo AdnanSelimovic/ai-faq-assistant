@@ -68,10 +68,27 @@
                     ></x-textarea>
                 </div>
                 <div class="mt-4 flex justify-end">
-                    <x-button type="button" id="ask-button">
-                        <span id="ask-button-text">Send</span>
-                    </x-button>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            id="copy-last-answer"
+                            class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                        >
+                            Copy answer
+                        </button>
+                        <button
+                            type="button"
+                            id="regenerate-answer"
+                            class="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600"
+                        >
+                            Regenerate
+                        </button>
+                        <x-button type="button" id="ask-button">
+                            <span id="ask-button-text">Send</span>
+                        </x-button>
+                    </div>
                 </div>
+                <div id="chat-action-status" class="mt-2 hidden text-xs text-zinc-500 dark:text-zinc-400"></div>
                 <div id="ask-error" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></div>
                 <details id="ask-sources" class="mt-4 hidden rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
                     <summary class="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -94,17 +111,23 @@
         const askChunks = document.getElementById('ask-chunks');
         const askModeSelect = document.getElementById('ask-mode');
         const askModeStatus = document.getElementById('ask-mode-status');
+        const copyLastAnswerButton = document.getElementById('copy-last-answer');
+        const regenerateButton = document.getElementById('regenerate-answer');
+        const actionStatus = document.getElementById('chat-action-status');
 
         const messageState = @json($messages->map(fn ($message) => [
             'role' => $message->role,
             'content' => $message->content,
         ])->values());
 
-        function appendMessage(message) {
-            if (emptyState) {
-                emptyState.remove();
-            }
+        function setBusy(isBusy) {
+            askButton.toggleAttribute('disabled', isBusy);
+            copyLastAnswerButton.toggleAttribute('disabled', isBusy);
+            regenerateButton.toggleAttribute('disabled', isBusy);
+            askButtonText.textContent = isBusy ? 'Sending...' : 'Send';
+        }
 
+        function createMessageElement(message) {
             const wrapper = document.createElement('div');
             const isAssistant = message.role === 'assistant';
             wrapper.className = isAssistant
@@ -117,27 +140,58 @@
 
             const content = document.createElement('p');
             content.className = 'mt-1 whitespace-pre-line text-sm text-zinc-700 dark:text-zinc-200';
-            content.textContent = message.content;
+            content.textContent = message.content || '';
 
             wrapper.appendChild(role);
             wrapper.appendChild(content);
-            messagesContainer.appendChild(wrapper);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            return { wrapper, content };
         }
 
-        askButton.addEventListener('click', async () => {
+        function appendMessage(message) {
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const { wrapper, content } = createMessageElement(message);
+            messagesContainer.appendChild(wrapper);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            return content;
+        }
+
+        async function typeText(target, text) {
+            target.textContent = '';
+
+            for (let index = 0; index < text.length; index += 1) {
+                target.textContent += text[index];
+                if (index % 3 === 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 8));
+                }
+            }
+        }
+
+        function getLastMessageByRole(role) {
+            for (let index = messageState.length - 1; index >= 0; index -= 1) {
+                if (messageState[index].role === role) {
+                    return messageState[index];
+                }
+            }
+
+            return null;
+        }
+
+        async function askQuestion(question) {
             askError.classList.add('hidden');
             askSources.classList.add('hidden');
             askChunks.innerHTML = '';
-            askButton.setAttribute('disabled', 'disabled');
-            askButtonText.textContent = 'Sending...';
+            actionStatus.classList.add('hidden');
+            setBusy(true);
 
-            const question = questionInput.value.trim();
             if (!question) {
                 askError.textContent = 'Please enter a question.';
                 askError.classList.remove('hidden');
-                askButton.removeAttribute('disabled');
-                askButtonText.textContent = 'Send';
+                setBusy(false);
                 return;
             }
 
@@ -155,8 +209,7 @@
                     const payload = await response.json().catch(() => ({}));
                     askError.textContent = payload.message || 'Unable to process your question.';
                     askError.classList.remove('hidden');
-                    askButton.removeAttribute('disabled');
-                    askButtonText.textContent = 'Send';
+                    setBusy(false);
                     return;
                 }
 
@@ -164,14 +217,33 @@
                 const userMessage = { role: 'user', content: question };
                 const assistantMessage = { role: 'assistant', content: payload.answer || '' };
 
-                messageState.push(userMessage, assistantMessage);
+                messageState.push(userMessage);
                 appendMessage(userMessage);
-                appendMessage(assistantMessage);
+                const assistantTarget = appendMessage({ role: 'assistant', content: '' });
+                await typeText(assistantTarget, assistantMessage.content);
+                messageState.push(assistantMessage);
 
                 (payload.chunks || []).forEach((chunk) => {
                     const item = document.createElement('div');
                     item.className = 'rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200';
-                    item.textContent = `#${chunk.id}: ${chunk.snippet}`;
+                    const prefix = document.createElement('div');
+                    prefix.className = 'text-xs text-zinc-500 dark:text-zinc-400';
+                    if (chunk.document_url) {
+                        const link = document.createElement('a');
+                        link.href = chunk.document_url;
+                        link.className = 'underline hover:no-underline';
+                        link.textContent = `#${chunk.id} ${chunk.document_title ? `(${chunk.document_title})` : ''}`.trim();
+                        prefix.appendChild(link);
+                    } else {
+                        prefix.textContent = `#${chunk.id}`;
+                    }
+
+                    const text = document.createElement('div');
+                    text.className = 'mt-1';
+                    text.textContent = chunk.snippet;
+
+                    item.appendChild(prefix);
+                    item.appendChild(text);
                     askChunks.appendChild(item);
                 });
 
@@ -180,14 +252,46 @@
                 }
 
                 questionInput.value = '';
-                askButton.removeAttribute('disabled');
-                askButtonText.textContent = 'Send';
+                setBusy(false);
             } catch (error) {
                 askError.textContent = 'Network error while sending your question.';
                 askError.classList.remove('hidden');
-                askButton.removeAttribute('disabled');
-                askButtonText.textContent = 'Send';
+                setBusy(false);
             }
+        }
+
+        askButton.addEventListener('click', async () => {
+            await askQuestion(questionInput.value.trim());
+        });
+
+        copyLastAnswerButton.addEventListener('click', async () => {
+            const lastAssistantMessage = getLastMessageByRole('assistant');
+            if (!lastAssistantMessage || !lastAssistantMessage.content) {
+                actionStatus.textContent = 'No assistant answer to copy yet.';
+                actionStatus.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(lastAssistantMessage.content);
+                actionStatus.textContent = 'Copied last answer.';
+                actionStatus.classList.remove('hidden');
+            } catch (error) {
+                actionStatus.textContent = 'Copy failed in this browser context.';
+                actionStatus.classList.remove('hidden');
+            }
+        });
+
+        regenerateButton.addEventListener('click', async () => {
+            const lastUserMessage = getLastMessageByRole('user');
+            if (!lastUserMessage || !lastUserMessage.content) {
+                actionStatus.textContent = 'No previous user message to regenerate.';
+                actionStatus.classList.remove('hidden');
+                return;
+            }
+
+            questionInput.value = lastUserMessage.content;
+            await askQuestion(lastUserMessage.content);
         });
 
         askModeSelect.addEventListener('change', async () => {
@@ -216,4 +320,3 @@
         });
     </script>
 @endsection
-

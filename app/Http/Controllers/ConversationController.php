@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Services\AskModeResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,13 @@ class ConversationController extends Controller
     public function index(): View
     {
         $conversations = Conversation::query()
+            ->addSelect([
+                'last_message_content' => Message::query()
+                    ->select('content')
+                    ->whereColumn('conversation_id', 'conversations.id')
+                    ->orderByDesc('id')
+                    ->limit(1),
+            ])
             ->withCount('messages')
             ->latest()
             ->get();
@@ -44,4 +52,3 @@ class ConversationController extends Controller
         ]);
     }
 }
-

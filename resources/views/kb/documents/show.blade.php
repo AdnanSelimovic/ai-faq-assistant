@@ -129,7 +129,7 @@
             </div>
             <div class="mt-4 space-y-4">
                 @forelse ($chunks as $chunk)
-                    <div class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                    <div id="chunk-{{ $chunk->id }}" class="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-950">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                                 Chunk {{ $chunk->chunk_index }}

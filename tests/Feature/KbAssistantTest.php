@@ -310,6 +310,53 @@ class KbAssistantTest extends TestCase
         $this->assertSame(0, Message::where('conversation_id', $conversationB->id)->count());
     }
 
+    public function test_first_user_message_auto_titles_new_chat(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'New chat']);
+        $document = KbDocument::create([
+            'title' => 'Support FAQ',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support is available weekdays from 9am to 6pm.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'Tell me the support schedule for weekdays please',
+        ])->assertOk();
+
+        $conversation->refresh();
+        $this->assertSame('Tell me the support schedule for weekdays please', $conversation->title);
+    }
+
+    public function test_ask_response_contains_source_jump_link_data(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create(['title' => 'Source Links']);
+        $document = KbDocument::create([
+            'title' => 'Billing FAQ',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Invoices are generated on the first business day of each month.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'When are invoices generated?',
+        ]);
+
+        $response->assertOk();
+        $chunks = $response->json('chunks');
+        $this->assertNotEmpty($chunks);
+        $this->assertSame($document->id, $chunks[0]['document_id'] ?? null);
+        $this->assertStringContainsString('/kb/documents/' . $document->id . '#chunk-', (string) ($chunks[0]['document_url'] ?? ''));
+    }
+
     public function test_llm_mode_uses_openai_response(): void
     {
         $user = User::factory()->create();

@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
@@ -20,12 +21,19 @@ class ChatController extends Controller
         ]);
 
         $conversation = $this->resolveConversation($request, $conversation);
+        $conversationHadMessages = $conversation->messages()->exists();
 
         $userMessage = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $validated['question'],
         ]);
+
+        if (!$conversationHadMessages && in_array((string) $conversation->title, ['', 'New chat', 'Default conversation'], true)) {
+            $conversation->update([
+                'title' => Str::limit($validated['question'], 60),
+            ]);
+        }
 
         $query = $validated['question'];
         $chunks = collect();
@@ -64,10 +72,14 @@ class ChatController extends Controller
         $chunkIds = $chunks->pluck('id')->all();
         $chunkSnippets = $chunks->map(function (KbChunk $chunk) {
             $snippet = substr($chunk->content, 0, 200);
+            $documentId = $chunk->document_id;
 
             return [
                 'id' => $chunk->id,
                 'snippet' => $snippet,
+                'document_id' => $documentId,
+                'document_title' => $chunk->document?->title,
+                'document_url' => $documentId ? route('kb.documents.show', $documentId) . '#chunk-' . $chunk->id : null,
             ];
         })->all();
 

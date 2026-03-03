@@ -7,6 +7,7 @@ This is a single-user Laravel knowledge-base/FAQ assistant POC with an authentic
 - Dashboard now acts as a chat index (`/dashboard`) instead of a single ask form.
 - New per-chat page (`/chats/{id}`) shows full message history and submits asks scoped to that conversation.
 - Conversation-scoped ask route added: `POST /chats/{id}/ask`.
+- New UX polish: auto-chat titles from first user question, copy/regenerate actions, source jump links, typing-effect rendering, and dashboard chat filtering.
 
 ## Working features (confirmed)
 - Auth flow (email-only gate): `/login` validates `SINGLE_USER_EMAIL`, creates/logs in a user, redirects to dashboard.

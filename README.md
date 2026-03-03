@@ -178,3 +178,21 @@ Key env/config options:
 - `ASK_HYBRID_VECTOR_WEIGHT` (default `0.7`, vector contribution in hybrid ranking)
 - `ASK_VECTOR_MIN_SCORE` (default `0.08`, minimum cosine score to accept vector-only retrieval)
 - `ASK_VECTOR_CANDIDATE_LIMIT` (default `300`)
+
+## MCP adapter
+
+This repository includes a local MCP server adapter at `mcp/server.js` that exposes the API as MCP tools:
+
+- `kb_list_documents`
+- `kb_create_document`
+- `kb_index_document`
+- `kb_search`
+- `kb_ask`
+
+Run:
+
+```bash
+npm run mcp:serve
+```
+
+Setup and demo evidence checklist: `docs/MCP_DEMO.md`.

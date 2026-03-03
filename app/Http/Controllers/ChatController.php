@@ -13,20 +13,15 @@ use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
-    public function ask(Request $request, AskModeResolver $modeResolver): JsonResponse
+    public function ask(Request $request, AskModeResolver $modeResolver, ?Conversation $conversation = null): JsonResponse
     {
         $validated = $request->validate([
             'question' => ['required', 'string', 'max:2000'],
         ]);
 
-        $conversation = Conversation::latest()->first();
-        if (!$conversation) {
-            $conversation = Conversation::create([
-                'title' => 'Default conversation',
-            ]);
-        }
+        $conversation = $this->resolveConversation($request, $conversation);
 
-        Message::create([
+        $userMessage = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $validated['question'],
@@ -83,7 +78,7 @@ class ChatController extends Controller
         $fallbackReason = null;
 
         if ($mode === AskModeResolver::MODE_LLM) {
-            $llmResult = $this->buildLlmAnswer($query, $chunks);
+            $llmResult = $this->buildLlmAnswer($query, $chunks, $conversation, $userMessage->id);
             if ($llmResult && empty($llmResult['error'])) {
                 $answer = $llmResult['answer'];
                 $model = $llmResult['model'];
@@ -110,6 +105,22 @@ class ChatController extends Controller
         return response()->json([
             'answer' => $answer,
             'chunks' => $chunkSnippets,
+        ]);
+    }
+
+    private function resolveConversation(Request $request, ?Conversation $conversation = null): Conversation
+    {
+        if ($conversation) {
+            return $conversation;
+        }
+
+        $conversationId = $request->integer('conversation_id');
+        if ($conversationId) {
+            return Conversation::findOrFail($conversationId);
+        }
+
+        return Conversation::latest()->first() ?? Conversation::create([
+            'title' => 'Default conversation',
         ]);
     }
 
@@ -200,7 +211,12 @@ class ChatController extends Controller
     /**
      * @return array<string, mixed>|null
      */
-    private function buildLlmAnswer(string $question, \Illuminate\Support\Collection $chunks): ?array
+    private function buildLlmAnswer(
+        string $question,
+        \Illuminate\Support\Collection $chunks,
+        Conversation $conversation,
+        int $currentUserMessageId
+    ): ?array
     {
         $apiKey = config('ask.openai_api_key');
         if (!$apiKey) {
@@ -210,9 +226,12 @@ class ChatController extends Controller
             ];
         }
 
+        $historyBlocks = $this->buildConversationHistoryBlocks($conversation, $currentUserMessageId);
         $contextBlocks = $this->buildContextBlocks($chunks);
-        $input = "QUESTION:\n{$question}\n\nCONTEXT:\n" . implode("\n\n", $contextBlocks);
-        $instructions = 'Answer ONLY using provided CONTEXT. If the answer is not in CONTEXT, say you don\'t have enough information in the KB. End with Sources: <chunk ids>.';
+        $history = empty($historyBlocks) ? '(none)' : implode("\n", $historyBlocks);
+        $context = empty($contextBlocks) ? '(none)' : implode("\n\n", $contextBlocks);
+        $input = "CHAT HISTORY:\n{$history}\n\nQUESTION:\n{$question}\n\nCONTEXT:\n{$context}";
+        $instructions = 'Use CHAT HISTORY for conversational continuity (for example, follow-up references to prior turns). Use CONTEXT for knowledge-base facts. If a factual answer is not present in CONTEXT, say you don\'t have enough information in the KB. End with Sources: <chunk ids>.';
 
         $start = microtime(true);
 
@@ -263,6 +282,55 @@ class ChatController extends Controller
             'model' => config('ask.openai_model'),
             'latency_ms' => $latencyMs,
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildConversationHistoryBlocks(Conversation $conversation, int $currentUserMessageId): array
+    {
+        $maxMessages = max(0, (int) config('ask.max_history_messages', 8));
+        $maxChars = max(0, (int) config('ask.max_history_chars', 2000));
+        if ($maxMessages === 0 || $maxChars === 0) {
+            return [];
+        }
+
+        $historyMessages = $conversation->messages()
+            ->where('id', '<', $currentUserMessageId)
+            ->orderByDesc('id')
+            ->limit($maxMessages)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $blocks = [];
+        $total = 0;
+
+        foreach ($historyMessages as $message) {
+            $role = strtolower((string) $message->role) === 'assistant' ? 'assistant' : 'user';
+            $content = trim((string) $message->content);
+            if ($content === '') {
+                continue;
+            }
+
+            $line = $role . ': ' . preg_replace('/\s+/', ' ', $content);
+            $length = strlen($line);
+
+            if ($total + $length > $maxChars) {
+                $remaining = $maxChars - $total;
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $blocks[] = substr($line, 0, $remaining);
+                break;
+            }
+
+            $blocks[] = $line;
+            $total += $length;
+        }
+
+        return $blocks;
     }
 
     /**

@@ -3,6 +3,11 @@
 ## Overview
 This is a single-user Laravel knowledge-base/FAQ assistant POC with an authenticated admin UI, KB document indexing into chunks, a dashboard ?Ask? flow that retrieves chunks and returns a placeholder answer, plus a Sanctum-protected JSON API layer for automation (MCP). No OpenAI/embeddings yet.
 
+## Latest update
+- Dashboard now acts as a chat index (`/dashboard`) instead of a single ask form.
+- New per-chat page (`/chats/{id}`) shows full message history and submits asks scoped to that conversation.
+- Conversation-scoped ask route added: `POST /chats/{id}/ask`.
+
 ## Working features (confirmed)
 - Auth flow (email-only gate): `/login` validates `SINGLE_USER_EMAIL`, creates/logs in a user, redirects to dashboard.
 - KB admin flow: list, create, show documents; index action generates chunks and updates status.

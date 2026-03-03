@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Conversation;
 use App\Models\KbDocument;
 use App\Models\Message;
 use App\Models\User;
@@ -263,6 +264,52 @@ class KbAssistantTest extends TestCase
         $this->assertNotEmpty($assistantMessage->retrieved_chunk_ids);
     }
 
+    public function test_dashboard_lists_conversations_and_chat_page_shows_messages(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'title' => 'Support chat',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Hello',
+        ]);
+
+        $dashboard = $this->actingAs($user)->get('/dashboard');
+        $dashboard->assertOk();
+        $dashboard->assertSee('Support chat');
+
+        $chat = $this->actingAs($user)->get("/chats/{$conversation->id}");
+        $chat->assertOk();
+        $chat->assertSee('Hello');
+    }
+
+    public function test_chat_ask_route_stores_messages_in_selected_conversation(): void
+    {
+        $user = User::factory()->create();
+        $conversationA = Conversation::create(['title' => 'Chat A']);
+        $conversationB = Conversation::create(['title' => 'Chat B']);
+
+        $document = KbDocument::create([
+            'title' => 'Ask Test',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Support hours are 9am to 6pm weekdays.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversationA->id}/ask", [
+            'question' => 'Support hours',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(2, Message::where('conversation_id', $conversationA->id)->count());
+        $this->assertSame(0, Message::where('conversation_id', $conversationB->id)->count());
+    }
+
     public function test_llm_mode_uses_openai_response(): void
     {
         $user = User::factory()->create();
@@ -325,5 +372,72 @@ class KbAssistantTest extends TestCase
             'mode' => AskModeResolver::MODE_LLM,
         ]);
         $response->assertCookie(AskModeResolver::COOKIE_NAME, AskModeResolver::MODE_LLM);
+    }
+
+    public function test_llm_mode_includes_prior_chat_history_in_prompt(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'title' => 'History Test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'How late is support available?',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Support is available 9am-6pm on weekdays.',
+        ]);
+
+        $document = KbDocument::create([
+            'title' => 'Support Hours',
+            'source_type' => 'faq',
+            'source_ref' => null,
+            'meta' => [
+                'raw_text' => 'Standard support is available Monday through Friday, 9:00 AM to 6:00 PM.',
+            ],
+        ]);
+        app(KbIndexer::class)->index($document);
+
+        config()->set('ask.openai_api_key', 'test-key');
+        config()->set('ask.openai_model', 'test-model');
+        config()->set('ask.default_mode', AskModeResolver::MODE_LLM);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output' => [
+                    [
+                        'type' => 'message',
+                        'content' => [
+                            [
+                                'type' => 'output_text',
+                                'text' => "Your previous question was about support availability.\nSources: #1",
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/chats/{$conversation->id}/ask", [
+            'question' => 'What question did I ask last time?',
+        ]);
+
+        $response->assertOk();
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            if ((string) $request->url() !== 'https://api.openai.com/v1/responses') {
+                return false;
+            }
+
+            $payload = $request->data();
+            $input = (string) ($payload['input'] ?? '');
+
+            return str_contains($input, 'CHAT HISTORY:')
+                && str_contains($input, 'user: How late is support available?')
+                && str_contains($input, 'assistant: Support is available 9am-6pm on weekdays.');
+        });
     }
 }
